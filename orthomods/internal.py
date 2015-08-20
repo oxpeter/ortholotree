@@ -78,7 +78,7 @@ def get_gene_fastas(genes=None, species=None, fastafile=None,
                 seq = extractseq(gene, db=dbpaths[species + '_lpep'])
 
                 if len(seq) == 0:
-                    verbalise("R", "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species))
+                    print "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species)
                     exit()
             else:   # if no species is given, check all LNRP files
                 for sp in specieslist:
@@ -87,7 +87,7 @@ def get_gene_fastas(genes=None, species=None, fastafile=None,
                         reportedspecies = sp
                         break
                 else:
-                    verbalise("R", "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species))
+                    print "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species)
                     defline, seq, reportedspecies = None, None, None
 
             # create fasta file from extracted sequence:
