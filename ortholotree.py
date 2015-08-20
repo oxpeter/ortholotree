@@ -14,10 +14,6 @@ from orthomods import internal, external
 
 ############################################################################
 
-dbpaths = config.import_paths()
-
-############################################################################
-
 def define_arguments():
     parser = argparse.ArgumentParser(description=
             "A module to perform a variety of gene term related analyses")
@@ -95,11 +91,11 @@ def define_arguments():
 
     return parser
 
-
-
-################################################
+############################################################################
 
 if __name__ == '__main__':
+    dbpaths = config.import_paths()
+
     parser = define_arguments()
     args = parser.parse_args()
 
@@ -107,6 +103,12 @@ if __name__ == '__main__':
     logfile = config.create_log(args, outdir=args.directory, outname=args.output)
 
     temp_dir = tempfile.mkdtemp()
+
+    # initialise dictionary of all accessible longest non-redundant peptide fasta files
+    specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros", "Bimp", "Bmor",
+                "Bter", "Cele", "Cflo", "Csol", "Dcit", "Fari", "Hsal", "Lhum",
+                "Mdem", "Mpha", "Mrot", "Nvit", "Oabi", "Pbar", "Pcan", "Sinv",
+                "Tcas", "Waur", "Cbir", "Ebur", "Dmel" ]
 
     ############ if generating phylogeny only ###########
     if args.raxml_only:
@@ -123,23 +125,24 @@ if __name__ == '__main__':
             internal.rename_newick(raxml_final, conversiondic=conv_dic)
         exit()
 
-    # initialise dictionary of all accessible longest non-redundant peptide fasta files
-    specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros", "Bimp", "Bmor",
-                "Bter", "Cele", "Cflo", "Csol", "Dcit", "Fari", "Hsal", "Lhum",
-                "Mdem", "Mpha", "Mrot", "Nvit", "Oabi", "Pbar", "Pcan", "Sinv",
-                "Tcas", "Waur", "Cbir", "Ebur", "Dmel" ]
-    lpep_paths = { s:dbpaths[s+'_lpep'] for s in specieslist }
 
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
+    if args.buildhmmer:
+        verbalise("B", "Creating alignment and hmmer model from %d input sequences" % len(genes))
+    else:
+        verbalise("B", "Extracting sequence from %s" % args.gene)
     homologlist = external.get_similar_sequences(temp_dir,
                                         buildhmmer=args.buildhmmer,
                                         fastafile=args.fasta,
                                         specieslist=specieslist,
                                         species=args.species,
+                                        genes=genes,
+                                        dbpaths=dbpaths,
                                         mincollect=args.mincollect,
                                         globalthresh=args.globalthresh,
                                         localthresh=args.scorethresh)
+    verbalise("C", "Best hmmer score = %d" % max( v[1] for v in homologlist.values()))
 
     ######### Extract identified sequences from LNRP fasta files #########
     conv_handle = open(logfile[:-3] + 'name_conversion.txt', 'w')
@@ -164,6 +167,7 @@ if __name__ == '__main__':
         for defline, seq, spec in internal.get_gene_fastas(genes=[searchname],
                                     species=homologlist[homolog][0],
                                     fastafile=None,
+                                    dbpaths=dbpaths,
                                     specieslist = specieslist,
                                     comment=homologlist[homolog][1],
                                     short=itercount):
