@@ -22,7 +22,7 @@ def mafft_align(inputfasta, outputfasta):
 
 ####### HMMer functions ########################
 def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
-                        specieslist={}, species=None,
+                        specieslist={}, species=None, genes=[], dbpaths={},
                         mincollect=2, globalthresh=0.2, localthresh=0.8):
     if buildhmmer:
         hmminput = os.path.join(temp_dir, "hmminput.fa")
@@ -31,15 +31,14 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=None,
                                                     fastafile=fastafile,
-                                                    specieslist=specieslist):
+                                                    specieslist=specieslist,
+                                                    dbpaths=dbpaths):
             seqcount += 1
             fasta_seq = "%s\n%s\n" % (defline, seq)
             handle.write(fasta_seq)
         handle.close()
 
         # create alignment of input sequences:
-        verbalise("B",
-                "Creating alignment and hmmer model of %d input sequences" % seqcount)
         mafft_align1 = os.path.join(temp_dir, "mafft_align_input.fa")
         mafft_align(hmminput, mafft_align1)
 
@@ -54,6 +53,7 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                                     query_species=species,
                                     minthresh=localthresh,
                                     temp_dir=temp_dir,
+                                    dbpaths=dbpaths,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
                                     hmmfile=hmmmodel)
@@ -66,15 +66,16 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=species,
                                                     fastafile=fastafile,
-                                                    specieslist=specieslist):
+                                                    specieslist=specieslist,
+                                                    dbpaths=dbpaths):
             fasta_seq = "%s\n%s\n" % (defline, seq)
-            verbalise("C", fasta_seq)
 
         ## phmmer all lpep files
         homologlist = hmmer_search(fasta_seq,
                                     specieslist,
                                     query_species=species,
                                     minthresh=localthresh,
+                                    dbpaths=dbpaths,
                                     temp_dir=temp_dir,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
@@ -82,7 +83,7 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
 
     return homologlist
 
-def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir,
+def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
                     minthresh=0.8, mincollect=2, globalthresh=0.01, hmmfile=None):
     """
     HMMER search of longest non-redundant peptide fasta files using either phmmer (with
@@ -102,15 +103,16 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir,
         handle.write(fasta_seq)
         handle.close()
 
-    verbalise("B", "Finding homologs using %s..." % searchcmd)
+
     homologlist = {}
     all_results = {}
     filtered_results = {}
     has_bestscore = False
     for sp in [query_species] + [ s for s in specieslist if s != query_species ]:
         try:
-            phandle = os.popen( " ".join([searchcmd, hmminput, lpep_paths[sp]]) )
+            phandle = os.popen( " ".join([searchcmd, hmminput, dbpaths[sp + '_lpep']]) )
         except KeyError:
+            print sp + '_lpep', "not found"
             continue
 
         # parse phmmer results:
@@ -132,10 +134,10 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir,
 
     # filter for global threshold (ie, based on % of best match). Most useful if no
     # species has been specified for fasta file.
+    if filtered_results == {}:
+        return {}
     bestscore = max( v[1] for s in filtered_results for v in filtered_results[s].values())
     global_thresh = globalthresh * bestscore
-    verbalise("C", "Best hmmer score = %d" % bestscore)
-    #verbalise("M", filtered_results.items())
     homologlist = { k:v for nd in filtered_results.values() for (k,v) in nd.items() if v[1] >= global_thresh }
 
     # clean up temporary files
