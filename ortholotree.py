@@ -135,7 +135,7 @@ def trim_name_dross(genename):
         return genename
 
 ####### fasta file operations ########
-def extractseq(geneID, db=dbpaths['cbir_lpep'], startpos=0, endpos=-1):
+def extractseq(geneID, db=dbpaths['Cbir_lpep'], startpos=0, endpos=-1):
     """ extracts sequence of geneID from the current annotations. type is cds,  pep or fasta.
     """
     #fname = dbpaths[type]
