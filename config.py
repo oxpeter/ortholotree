@@ -58,8 +58,8 @@ def read_pathways(config_file):
     # split each line into two (variable and path), if no comment symbol # is present:
     config_g = ( (line.split()[0], line.split()[1]) for line in config_h if re.search('#',line) == None)
     for fileid, pathway in config_g:
-        if resource_exists('genomepy', fileid + '.db'):
-            pathway_dict[fileid] = resource_filename('genomepy',
+        if resource_exists('ortholotree', fileid + '.db'):
+            pathway_dict[fileid] = resource_filename('ortholotree',
                                                 os.path.join(['data/', fileid, '.db']))
         else:
             pathway_dict[fileid] = pathway
@@ -198,12 +198,8 @@ def rebuild_config():
     return pathway_dict
 
 def import_paths():
-    #config_file = pkgutil.get_data('genomepy', 'data/pathways.cfg')
-    #print config_file
-    #config_str = resource_string('genomepy', 'data/pathways.cfg')
-    #nothing_str = resource_string('genomepy', 'data/nothing.cfg')
-    config_exists = resource_exists('genomepy', 'data/pathways.cfg')
-    config_path = resource_filename('genomepy', 'data/pathways.cfg')
+    config_exists = resource_exists('ortholotree', 'data/pathways.cfg')
+    config_path = resource_filename('ortholotree', 'data/pathways.cfg')
 
     print "Using config file from %s" % (config_path)
     if config_exists:
