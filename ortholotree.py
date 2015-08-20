@@ -94,6 +94,12 @@ def define_arguments():
                         flag until you have looked at your results without it, and
                         preferably tried to eliminate long genes by using better search
                         models.""")
+    parser.add_argument("-m", "--minlength", type=int,
+                        help="""If provided, will remove all genes shorter than this
+                        size. It is not recommended that you use this
+                        flag until you have looked at your results without it, and
+                        preferably tried to eliminate short genes by using better search
+                        models.""")
 
     return parser
 
@@ -636,9 +642,13 @@ if __name__ == '__main__':
                                     specieslist = specieslist,
                                     comment=homologlist[homolog][1],
                                     short=itercount):
-
+            
+            # filter based on size:
             if args.maxlength and len(seq) > args.maxlength:
                 continue
+            if args.minlength and len(seq) < args.minlength:
+                continue
+            
             seqdic[seq] = defline
 
         shortname = phylipise(homologlist[homolog][0], itercount)

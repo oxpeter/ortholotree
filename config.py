@@ -4,8 +4,10 @@
 It first looks for the config file pathways.config, and if it cannot find that, then it
 builds one itself.
 
-Later improvements should include storing the object as a pickled object for faster
-access.
+Because people who stare at genomes a lot will already have their files stored somewhere
+convenient for them, the construction of a config file that simply points to their 
+location for extraction by the other modules seems to make a lot of sense to me. This 
+also prevents absolute paths from having to be coded. 
 """
 
 import os, sys
