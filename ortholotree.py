@@ -18,8 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 
-from genomepy import config
-from genomepy import genematch as gm
+import config
 
 ############################################################################
 
@@ -130,6 +129,29 @@ def trim_name_dross(genename):
         return genename
 
 ####### fasta file operations ########
+def extractseq(geneID, db=dbpaths['cbir_lpep'], startpos=0, endpos=-1):
+    """ extracts sequence of geneID from the current annotations. type is cds,  pep or fasta.
+    """
+    #fname = dbpaths[type]
+    geneseq = ""
+    fobj = open(db, 'rb')
+    for line in fobj:
+        if line[0] == '>':
+            query = re.search( geneID + '[\s]', line)
+        if query:
+            thisline = fobj.next()
+
+            while thisline[0] != '>':
+                geneseq += thisline.strip()
+                try:
+                    thisline = fobj.next()
+                except StopIteration:
+                    break
+            else:
+                break
+    fobj.close()
+    return geneseq[startpos:endpos]
+
 def get_gene_fastas(genes=None, species=None, fastafile=None,
                     specieslist = [], comment=None, short=False):
     """
@@ -140,14 +162,14 @@ def get_gene_fastas(genes=None, species=None, fastafile=None,
         for gene in genes:
             if species in specieslist:
                 reportedspecies = species
-                seq = gm.extractseq(gene, db=dbpaths[species + '_lpep'])
+                seq = extractseq(gene, db=dbpaths[species + '_lpep'])
 
                 if len(seq) == 0:
                     verbalise("R", "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species))
                     exit()
             else:   # if no species is given, check all LNRP files
                 for sp in specieslist:
-                    seq = gm.extractseq(gene, db=dbpaths[sp + '_lpep'])
+                    seq = extractseq(gene, db=dbpaths[sp + '_lpep'])
                     if len(seq) > 0:   # found a match!
                         reportedspecies = sp
                         break
