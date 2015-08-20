@@ -20,19 +20,21 @@ However, if you initialise the file with config.py, it will put all the necessar
 the file, even if it cannot find the appropriate file path. 
 # prerequisites
 orthotree relies on the 
-hmmer (for protein searching - hmmer.janelia.org)
-mafft (for sequence alignment - http://mafft.cbrc.jp/alignment/software/)
-RAxML (for phylogeny construction - http://sco.h-its.org/exelixis/web/software/raxml)
+*hmmer (for protein searching - http://hmmer.janelia.org)
+*mafft (for sequence alignment - http://mafft.cbrc.jp/alignment/software/)
+*RAxML (for phylogeny construction - http://sco.h-its.org/exelixis/web/software/raxml)
 
 you will also need to install the following python libraries:
-Biopython
-Matplotlib
-Numpy
+*Biopython
+*Matplotlib
+*Numpy
 
 # usage
 ortholotree will work best with a couple of iterations of usage, depending on your 
 starting point. 
+
 __1st pass__
+
 If you wish to find the ortholog of a particular gene, then you will 
 start by providing the peptide ID to the -g flag, or the link to a fasta file 
 containing a single sequence using the -f flag. This will run the phmmer search on all 
@@ -54,6 +56,7 @@ threshold, then pass a value of 0 to this flag.
 genes with a score that is above the specified percentage of the best score will be kept. 
 
 __2nd pass__
+
 Using the results of the first pass, select likely ortholog candidates (this may simply
 be the gene in your target species, as well as your initial query gene). Pass all genes 
 as a comma-separated list to the -g flag, and specify -B to tell the program to build a 
@@ -70,6 +73,7 @@ multiple gene families, giving too many genes, or not enough.
 
 
 __3rd pass__
+
 This final pass will often not be necessary, but if you want to tidy up your results, 
 then use the tree built by the 2nd pass to identify the orthologs from all species
 available, and use all identified orthologs to build the hmm model as specified above. 
