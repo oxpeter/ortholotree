@@ -1,0 +1,10 @@
+>Cbir|LOC12345 testgene1
+ABCDEFGABCDEFGABCDEFGABCDEFGABCDEFG
+hijklmnopHIJKLMhijklmnopHIJKLMNOP
+
+QRSTUV
+>Cbir|LOC54321 testgene2
+QRStuvABCdef
+
+thisisahiddenmessage
+

@@ -1,0 +1,4 @@
+>Cbir|LOC12345 testgene1
+This#fasta file has illegal characters in the sequence!!!
+
+
