@@ -43,80 +43,103 @@ def trim_name_dross(genename):
         return genename
 
 ####### fasta file operations ##################
-def extractseq(geneID, db="", startpos=0, endpos=-1):
-    """ extracts sequence of geneID from the current annotations. type is cds,  pep or fasta.
+def parsefasta(fastafile, verbalise=lambda *a: None):
     """
-    geneseq = ""
-    fobj = open(db, 'rb')
-    for line in fobj:
+    creates a generator that yields each successive sequence and defline.
+    """
+    handle = open(fastafile, 'rb')
+    seq = ""
+    for line in handle:
         if line[0] == '>':
-            query = re.search( geneID + '[\s]', line)
-        if query:
-            thisline = fobj.next()
+            seq = seq.replace(" ","")
+            if is_validfasta(seq, verbalise=verbalise):
+                yield defline, seq
+            defline = line.strip()
+            seq = ""
+        else:
+            seq += line.strip()
+    else:
+        seq = seq.replace(" ","")
+        if is_validfasta(seq, verbalise=verbalise):
+            yield defline, seq
 
-            while thisline[0] != '>':
-                geneseq += thisline.strip()
-                try:
-                    thisline = fobj.next()
-                except StopIteration:
-                    break
-            else:
-                break
-    fobj.close()
-    return geneseq[startpos:endpos]
+def is_validfasta(seq, verbalise=lambda *a: None):
+    if len(seq) == 0:
+        return False
+    badcharacters = re.findall('[\(\)\!\@\#\$\%\^\&\*\>\<\\\|\/\:\;]',seq)
+    if badcharacters:
+        verbalise("R", "Invalid characters found in fastafile: %s" % " ".join(set(badcharacters)))
+        return False
+    else:
+        return True
 
-def get_gene_fastas(genes=None, species=None, fastafile=None,
-                    specieslist = [], comment=None, short=False, dbpaths={}):
+def find_gene(fastafile, gene, verbalise=lambda *a: None):
+    genename = trim_name_dross(gene)
+    for defline, seq in parsefasta(fastafile):
+        if re.search( '[^\w]' + genename + '(\s.*)?$', defline):  #  '[\s\|\$]'
+            return defline, seq
+    else:
+        return None, None
+
+def get_gene_fastas(genes=None, fastafile=None,
+                    startpos=0, endpos=None,
+                    specieslist = [], species=None,
+                    comment=None, short=False,
+                    dbpaths={}, verbalise=(lambda *a: None)):
     """
     Can either be given as a transcript name to be searched within the peptide databases,
     or can be a fasta file.
     """
     if genes:
+        if dbpaths=={} or specieslist == []:
+            yield None, None, None
+            raise StopIteration
+        if isinstance(genes, str):
+            genes = [genes]
         for gene in genes:
             if species in specieslist:
                 reportedspecies = species
-                seq = extractseq(gene, db=dbpaths[species + '_lpep'])
+                defline, seq = find_gene(dbpaths[species + '_lpep'], gene, verbalise=verbalise)
+                if seq:
+                    seq = seq[startpos:endpos]
 
-                if len(seq) == 0:
-                    print "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species)
-                    exit()
-            else:   # if no species is given, check all LNRP files
+                    if len(seq) == 0:
+                        verbalise("R",
+                            "Transcript %s (%s) could not be found in the database." % (gene, species))
+                        defline, seq, reportedspecies = None, None, None
+
+            else:   # if no species is given, check all peptide files in dbpaths
                 for sp in specieslist:
-                    seq = extractseq(gene, db=dbpaths[sp + '_lpep'])
-                    if len(seq) > 0:   # found a match!
-                        reportedspecies = sp
-                        break
+                    seq = ""
+                    defline, seq = find_gene(dbpaths[sp + '_lpep'], gene, verbalise=verbalise)
+                    if seq:
+                        seq = seq[startpos:endpos]
+                        if len(seq) > 0:   # found a match!
+                            reportedspecies = sp
+                            break
                 else:
-                    print "Transcript %s could not be extracted from the LNRP database for species %s" % (gene, species)
+                    verbalise("R",
+                        "Transcript %s (%s) could not be found in the database." % (gene, species))
                     defline, seq, reportedspecies = None, None, None
 
             # create fasta file from extracted sequence:
-            if short:
-                name = phylipise(reportedspecies, short)
-                defline = ">%s (%s) %s" % (name, reportedspecies, comment)
-            else:
-                defline = ">%s (%s) %s" % (gene, reportedspecies, comment)
+            if seq:
+                if short:
+                    name = phylipise(reportedspecies, short)
+                    defline = ">%s (%s) %s" % (name, reportedspecies, comment)
+                else:
+                    defline = ">%s (%s) %s" % (gene, reportedspecies, comment)
 
             yield defline, seq, reportedspecies
 
-    elif fastafile:
-        handle = open(fastafile, 'rb')
-        seq = ""
-        for line in handle:
-            if line[0] == '>':
-                if seq != "":
-                    yield defline, seq, None
-                defline = line.strip()
-                seq = ""
-            else:
-                seq += line.strip()
-        else:
-            yield defline, seq, None
+    if fastafile:
+        for defline, seq in parsefasta(fastafile, verbalise=verbalise):
+            yield defline, seq[startpos:endpos], None
 
-    else:
+    if not genes and not fastafile:
         yield None, None, None
 
-def rank_scores(homologlist, thresh1, thresh2=None, genename=None, outfile=None, showplot=False):
+def rank_scores(homologlist, thresh1=0, thresh2=None, genename=None, outfile=None, showplot=False):
     yvalues = sorted([val[1] for val in homologlist.values()], reverse=True)
     plt.plot(yvalues)
     score_cutoff = thresh1 * max(yvalues)
