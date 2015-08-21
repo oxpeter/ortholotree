@@ -171,7 +171,8 @@ if __name__ == '__main__':
                                     specieslist = specieslist,
                                     comment=homologlist[homolog][1],
                                     short=itercount):
-
+            if not seq:
+                continue
             # filter based on size:
             if args.maxlength and len(seq) > args.maxlength:
                 continue
