@@ -90,6 +90,7 @@ def get_gene_fastas(genes=None, fastafile=None,
     Can either be given as a transcript name to be searched within the peptide databases,
     or can be a fasta file.
     """
+
     if genes:
         if dbpaths=={} or specieslist == []:
             yield None, None, None

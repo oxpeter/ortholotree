@@ -117,7 +117,10 @@ if __name__ == '__main__':
             exit()
         verbalise("B", "Running RAxML analysis to construct phylogeny using supplied alignment")
         phylip_alignment = internal.make_phylip(args.fasta, logfile)
-        raxml_final = external.raxml_phylogeny(phylip_alignment, logfile, bootstrap=args.bootstrap)
+        raxml_final = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=args.bootstrap,
+                                                threads=args.threads)
         if args.name_conversion:
             handle = open(args.name_conversion, 'rb')
             conv_dic = { line.split()[0]:(line.split()[2], line.split()[1]) for line in handle }
@@ -128,10 +131,6 @@ if __name__ == '__main__':
 
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
-    if args.buildhmmer:
-        verbalise("B", "Creating alignment and hmmer model from %d input sequences" % len(genes))
-    else:
-        verbalise("B", "Extracting sequence from %s" % args.gene)
     homologlist = external.get_similar_sequences(temp_dir,
                                         buildhmmer=args.buildhmmer,
                                         fastafile=args.fasta,
@@ -141,7 +140,8 @@ if __name__ == '__main__':
                                         dbpaths=dbpaths,
                                         mincollect=args.mincollect,
                                         globalthresh=args.globalthresh,
-                                        localthresh=args.scorethresh)
+                                        localthresh=args.scorethresh,
+                                        verbalise=verbalise)
     verbalise("C", "Best hmmer score = %d" % max( v[1] for v in homologlist.values()))
 
     ######### Extract identified sequences from LNRP fasta files #########
@@ -225,17 +225,20 @@ if __name__ == '__main__':
     if args.bootstrap:
                 raxml_best = external.raxml_phylogeny(phylip_alignment,
                                         logfile,
-                                        bootstrap=False)
+                                        bootstrap=False, threads=args.threads)
                 best_renamed = internal.rename_newick(raxml_best, conversiondic=conv_dic)
                 raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
                                         logfile,
-                                        bootstrap=args.bootstrap)
+                                        bootstrap=args.bootstrap,threads=args.threads)
                 bstrap_renamed = internal.rename_newick(raxml_bstrap, conversiondic=conv_dic)
                 final_tree = external.apply_boostrap(best_renamed, bstrap_renamed, logfile)
                 verbalise("Y",
                     "Best tree with bootstrap support can be found at %s" % final_tree)
     else:
-        raxml_final = external.raxml_phylogeny(phylip_alignment, logfile, bootstrap=args.bootstrap)
+        raxml_final = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=args.bootstrap,
+                                                threads=args.threads)
         raxml_renamed = internal.rename_newick(raxml_final, conversiondic=conv_dic)
 
     # clean up temp files and directory

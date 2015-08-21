@@ -23,25 +23,29 @@ def mafft_align(inputfasta, outputfasta):
 ####### HMMer functions ########################
 def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                         specieslist={}, species=None, genes=[], dbpaths={},
-                        mincollect=2, globalthresh=0.2, localthresh=0.8):
+                        mincollect=2, globalthresh=0.2, localthresh=0.8,
+                        verbalise=lambda *a: None):
     if buildhmmer:
         hmminput = os.path.join(temp_dir, "hmminput.fa")
         handle = open(hmminput, 'w')
         seqcount = 0
+        verbalise("B", "Extracting sequence data from %d peptides" % len(genes))
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=None,
                                                     fastafile=fastafile,
                                                     specieslist=specieslist,
                                                     dbpaths=dbpaths):
-            seqcount += 1
-            fasta_seq = "%s\n%s\n" % (defline, seq)
-            handle.write(fasta_seq)
+            if seq:
+                seqcount += 1
+                fasta_seq = "%s\n%s\n" % (defline, seq)
+                handle.write(fasta_seq)
         handle.close()
 
         # create alignment of input sequences:
         mafft_align1 = os.path.join(temp_dir, "mafft_align_input.fa")
         mafft_align(hmminput, mafft_align1)
 
+        verbalise("B", "Creating hidden markov model from %d sequences" % seqcount)
         # create hmmbuild model of alignment:
         hmmmodel = os.path.join(temp_dir, "hmmmodel.fa")
         open(hmmmodel, 'a').close()
@@ -56,12 +60,14 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                                     dbpaths=dbpaths,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
-                                    hmmfile=hmmmodel)
+                                    hmmfile=hmmmodel,
+                                    verbalise=verbalise)
 
         os.remove(mafft_align1)
         os.remove(hmminput)
 
     else:
+        verbalise("B", "Extracting sequence from %s" % genes)
         # run phmmer on a single input gene/sequence:
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=species,
@@ -79,12 +85,14 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                                     temp_dir=temp_dir,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
-                                    hmmfile=None)
+                                    hmmfile=None,
+                                    verbalise=verbalise)
 
     return homologlist
 
 def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
-                    minthresh=0.8, mincollect=2, globalthresh=0.01, hmmfile=None):
+                    minthresh=0.8, mincollect=2, globalthresh=0.01, hmmfile=None,
+                    verbalise=lambda *a: None):
     """
     HMMER search of longest non-redundant peptide fasta files using either phmmer (with
     query protein as input) or hmmersearch (using constructed hmmfile as input).
@@ -103,7 +111,7 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
         handle.write(fasta_seq)
         handle.close()
 
-
+    verbalise("B", "Finding similar sequences using %s" % searchcmd)
     homologlist = {}
     all_results = {}
     filtered_results = {}
@@ -147,7 +155,7 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
 
 ####### RAxML functions ########
 
-def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False):
+def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False, threads=2):
     if bootstrap:
         bootstrapopt = '-N 100 -x ' + str(bootstrap)
         bs_str = 'bs.'
@@ -163,7 +171,8 @@ def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False):
         prefix = "RAxML_bestTree."
     raxml_final = os.path.join(os.path.dirname(logfile), prefix + raxml_outfile)
 
-    cmd = " ".join(["raxmlHPC", "-s", phylip_alignment,
+    cmd = " ".join(["RAxML", "-s", phylip_alignment,
+                                    '-T', str(threads),
                                     '-w', os.path.dirname(logfile),
                                     "-n", raxml_outfile,
                                     '-p', "12345",
