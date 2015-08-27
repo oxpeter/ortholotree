@@ -149,28 +149,7 @@ if __name__ == '__main__':
             internal.rename_newick(raxml_final, conversiondic=conv_dic)
         exit()
 
-#############################
-############################
-    if args.bootstrap:
-                raxml_best = external.raxml_phylogeny(phylip_alignment,
-                                        logfile,
-                                        bootstrap=False, threads=args.threads)
-                best_renamed = internal.rename_newick(raxml_best, conversiondic=conv_dic)
-                raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
-                                        logfile,
-                                        bootstrap=args.bootstrap,threads=args.threads)
-                bstrap_renamed = internal.rename_newick(raxml_bstrap, conversiondic=conv_dic)
-                final_tree = external.apply_boostrap(best_renamed, bstrap_renamed, logfile)
-                verbalise("Y",
-                    "Best tree with bootstrap support can be found at %s" % final_tree)
-    else:
-        raxml_final = external.raxml_phylogeny(phylip_alignment,
-                                                logfile,
-                                                bootstrap=args.bootstrap,
-                                                threads=args.threads)
-        raxml_renamed = internal.rename_newick(raxml_final, conversiondic=conv_dic)
-####################################
-###############################
+
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
     homologlist = external.get_similar_sequences(temp_dir,
