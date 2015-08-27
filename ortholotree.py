@@ -120,35 +120,12 @@ if __name__ == '__main__':
         if not args.fasta:
             verbalise("R", "No fasta alignment was supplied!")
             exit()
+
         verbalise("B", "Running RAxML analysis to construct phylogeny using supplied alignment")
-        phylip_alignment = internal.make_phylip(args.fasta, logfile)
-        if args.bootstrap:
-            raxml_best = external.raxml_phylogeny(phylip_alignment,
-                                                    logfile,
-                                                    bootstrap=False,
-                                                    threads=args.threads)
-            raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
-                                                    logfile,
-                                                    bootstrap=args.bootstrap,
-                                                    threads=args.threads)
-            raxml_final = external.apply_boostrap(raxml_best, raxml_bstrap, logfile)
-
-            verbalise("Y",
-                    "Best tree with bootstrap support can be found at %s" % raxml_final)
-
-        else:
-            raxml_final = external.raxml_phylogeny(phylip_alignment,
-                                                    logfile,
-                                                    bootstrap=args.bootstrap,
-                                                    threads=args.threads)
-            verbalise("Y", "Best tree can be found at %s" % raxml_final)
-        if args.name_conversion:
-            handle = open(args.name_conversion, 'rb')
-            conv_dic = { line.split()[0]:(line.split()[2], line.split()[1]) for line in handle }
-            handle.close()
-            internal.rename_newick(raxml_final, conversiondic=conv_dic)
+        final_tree = internal.raxml(logfile, args.fasta, bootstrap=args.bootstrap,
+                        threads=args.threads, name_conversion=args.name_conversion,
+                        verbalise=verbalise)
         exit()
-
 
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
@@ -242,25 +219,11 @@ if __name__ == '__main__':
     could be setup to allow overriding for fringe case analyses).
     """
     verbalise("B", "Running RAxML analysis to construct phylogeny")
-    phylip_alignment = internal.make_phylip(mafft_alignment, logfile)
-    if args.bootstrap:
-                raxml_best = external.raxml_phylogeny(phylip_alignment,
-                                        logfile,
-                                        bootstrap=False, threads=args.threads)
-                best_renamed = internal.rename_newick(raxml_best, conversiondic=conv_dic)
-                raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
-                                        logfile,
-                                        bootstrap=args.bootstrap,threads=args.threads)
-                bstrap_renamed = internal.rename_newick(raxml_bstrap, conversiondic=conv_dic)
-                final_tree = external.apply_boostrap(best_renamed, bstrap_renamed, logfile)
-                verbalise("Y",
-                    "Best tree with bootstrap support can be found at %s" % final_tree)
-    else:
-        raxml_final = external.raxml_phylogeny(phylip_alignment,
-                                                logfile,
-                                                bootstrap=args.bootstrap,
-                                                threads=args.threads)
-        raxml_renamed = internal.rename_newick(raxml_final, conversiondic=conv_dic)
+    final_tree = internal.raxml(logfile, mafft_alignment, bootstrap=args.bootstrap,
+                        threads=args.threads, name_conversion=None,
+                        verbalise=verbalise)
+    raxml_renamed = internal.rename_newick(final_tree, conversiondic=conv_dic)
+                        
 
     # clean up temp files and directory
     for file in [ homolog_fasta, ]:

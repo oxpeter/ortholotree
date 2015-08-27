@@ -314,7 +314,36 @@ def parse_the_hmmer(handle):
     return parse_dic
 
 ####### Phylogeny creation/manipulation ########
+def raxml(logfile, fastafile, bootstrap=False, threads=2, 
+            name_conversion=None, verbalise=lambda *a: None, ):        
+    phylip_alignment = make_phylip(fastafile, logfile)
+    if args.bootstrap:
+        raxml_best = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=False,
+                                                threads=threads)
+        raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=bootstrap,
+                                                threads=threads)
+        raxml_final = external.apply_boostrap(raxml_best, raxml_bstrap, logfile)
 
+        verbalise("Y",
+                "Best tree with bootstrap support can be found at %s" % raxml_final)
+
+    else:
+        raxml_final = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=bootstrap,
+                                                threads=threads)
+        verbalise("Y", "Best tree can be found at %s" % raxml_final)
+    if name_conversion:
+        handle = open(name_conversion, 'rb')
+        conv_dic = { line.split()[0]:(line.split()[2], line.split()[1]) for line in handle }
+        handle.close()
+        rename_newick(raxml_final, conversiondic=conv_dic)
+    return raxml_final
+        
 def rename_newick(raxml_final, conversiondic={}):
     #replace short names in newick file with full names
     if os.path.exists(raxml_final):
