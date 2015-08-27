@@ -110,6 +110,11 @@ if __name__ == '__main__':
                 "Mdem", "Mpha", "Mrot", "Nvit", "Oabi", "Pbar", "Pcan", "Sinv",
                 "Tcas", "Waur", "Cbir", "Ebur", "Dmel" ]
 
+
+    if args.threads < 2:
+        verbalise("R", "Minimum number of threads allowed is 2")
+        exit()
+
     ############ if generating phylogeny only ###########
     if args.raxml_only:
         if not args.fasta:
@@ -117,10 +122,26 @@ if __name__ == '__main__':
             exit()
         verbalise("B", "Running RAxML analysis to construct phylogeny using supplied alignment")
         phylip_alignment = internal.make_phylip(args.fasta, logfile)
-        raxml_final = external.raxml_phylogeny(phylip_alignment,
-                                                logfile,
-                                                bootstrap=args.bootstrap,
-                                                threads=args.threads)
+        if args.bootstrap:
+            raxml_best = external.raxml_phylogeny(phylip_alignment,
+                                                    logfile,
+                                                    bootstrap=False,
+                                                    threads=args.threads)
+            raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
+                                                    logfile,
+                                                    bootstrap=args.bootstrap,
+                                                    threads=args.threads)
+            raxml_final = external.apply_boostrap(raxml_best, raxml_bstrap, logfile)
+
+            verbalise("Y",
+                    "Best tree with bootstrap support can be found at %s" % raxml_final)
+
+        else:
+            raxml_final = external.raxml_phylogeny(phylip_alignment,
+                                                    logfile,
+                                                    bootstrap=args.bootstrap,
+                                                    threads=args.threads)
+            verbalise("Y", "Best tree can be found at %s" % raxml_final)
         if args.name_conversion:
             handle = open(args.name_conversion, 'rb')
             conv_dic = { line.split()[0]:(line.split()[2], line.split()[1]) for line in handle }
@@ -128,7 +149,28 @@ if __name__ == '__main__':
             internal.rename_newick(raxml_final, conversiondic=conv_dic)
         exit()
 
-
+#############################
+############################
+    if args.bootstrap:
+                raxml_best = external.raxml_phylogeny(phylip_alignment,
+                                        logfile,
+                                        bootstrap=False, threads=args.threads)
+                best_renamed = internal.rename_newick(raxml_best, conversiondic=conv_dic)
+                raxml_bstrap = external.raxml_phylogeny(phylip_alignment,
+                                        logfile,
+                                        bootstrap=args.bootstrap,threads=args.threads)
+                bstrap_renamed = internal.rename_newick(raxml_bstrap, conversiondic=conv_dic)
+                final_tree = external.apply_boostrap(best_renamed, bstrap_renamed, logfile)
+                verbalise("Y",
+                    "Best tree with bootstrap support can be found at %s" % final_tree)
+    else:
+        raxml_final = external.raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=args.bootstrap,
+                                                threads=args.threads)
+        raxml_renamed = internal.rename_newick(raxml_final, conversiondic=conv_dic)
+####################################
+###############################
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
     homologlist = external.get_similar_sequences(temp_dir,
