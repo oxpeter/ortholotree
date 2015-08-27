@@ -156,6 +156,9 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
 ####### RAxML functions ########
 
 def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False, threads=2):
+    if threads < 2:
+        verbalise("R", "Minimum number of threads allowed is 2")
+        exit()
     if bootstrap:
         bootstrapopt = '-N 100 -x ' + str(bootstrap)
         bs_str = 'bs.'
