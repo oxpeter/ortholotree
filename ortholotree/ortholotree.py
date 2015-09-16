@@ -122,7 +122,7 @@ if __name__ == '__main__':
             exit()
 
         verbalise("B", "Running RAxML analysis to construct phylogeny using supplied alignment")
-        final_tree = internal.raxml(logfile, args.fasta, bootstrap=args.bootstrap,
+        final_tree = external.raxml(logfile, args.fasta, bootstrap=args.bootstrap,
                         threads=args.threads, name_conversion=args.name_conversion,
                         verbalise=verbalise)
         exit()
@@ -219,11 +219,11 @@ if __name__ == '__main__':
     could be setup to allow overriding for fringe case analyses).
     """
     verbalise("B", "Running RAxML analysis to construct phylogeny")
-    final_tree = internal.raxml(logfile, mafft_alignment, bootstrap=args.bootstrap,
+    final_tree = external.raxml(logfile, mafft_alignment, bootstrap=args.bootstrap,
                         threads=args.threads, name_conversion=None,
                         verbalise=verbalise)
     raxml_renamed = internal.rename_newick(final_tree, conversiondic=conv_dic)
-                        
+
 
     # clean up temp files and directory
     for file in [ homolog_fasta, ]:
