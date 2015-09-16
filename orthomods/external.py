@@ -97,7 +97,7 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     HMMER search of longest non-redundant peptide fasta files using either phmmer (with
     query protein as input) or hmmersearch (using constructed hmmfile as input).
     Finds best score, and collects all proteins with score > PC% (default 80%) of the
-    best score, but limited to no more than X (default 2) proteins per species.
+    best score, but limited to no less than X (default 2) proteins per species.
     """
 
     # set search type and input files:
@@ -154,6 +154,36 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     return homologlist
 
 ####### RAxML functions ########
+def raxml(logfile, fastafile, bootstrap=False, threads=2,
+            name_conversion=None, verbalise=lambda *a: None, ):
+    phylip_alignment = internal.make_phylip(fastafile, logfile)
+    if bootstrap:
+        raxml_best = raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=False,
+                                                threads=threads)
+        raxml_bstrap = raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=bootstrap,
+                                                threads=threads)
+        raxml_final = apply_boostrap(raxml_best, raxml_bstrap, logfile)
+
+        verbalise("Y",
+                "Best tree with bootstrap support can be found at %s" % raxml_final)
+
+    else:
+        raxml_final = raxml_phylogeny(phylip_alignment,
+                                                logfile,
+                                                bootstrap=bootstrap,
+                                                threads=threads)
+        verbalise("Y", "Best tree can be found at %s" % raxml_final)
+    if name_conversion:
+        handle = open(name_conversion, 'rb')
+        conv_dic = { line.split()[0]:(line.split()[2], line.split()[1]) for line in handle }
+        handle.close()
+        internal.rename_newick(raxml_final, conversiondic=conv_dic)
+    return raxml_final
+
 
 def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False, threads=2):
     if threads < 2:
