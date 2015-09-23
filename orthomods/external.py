@@ -25,6 +25,19 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                         specieslist={}, species=None, genes=[], dbpaths={},
                         mincollect=2, globalthresh=0.2, localthresh=0.8,
                         verbalise=lambda *a: None):
+
+    # clean gene list type and content:
+    if not isinstance(genes, list):
+        genes = [genes]
+    genes = [ g for g in genes if g != '' ]
+
+    # count genes provided:
+    genelist_num, fasta_num = internal.count_genes(genes, fastafile)
+    verbalise("Y", "Genelist size:%d\nFasta size:%d" % (genelist_num, fasta_num ))
+
+    if genelist_num + fasta_num > 1:
+        buildhmmer = True
+
     if buildhmmer:
         hmminput = os.path.join(temp_dir, "hmminput.fa")
         handle = open(hmminput, 'w')
@@ -40,7 +53,9 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                 fasta_seq = "%s\n%s\n" % (defline, seq)
                 handle.write(fasta_seq)
         handle.close()
-
+        if seqcount == 0:
+            verbalise("R", "No genes sequences were found.")
+            return {}
         # create alignment of input sequences:
         mafft_align1 = os.path.join(temp_dir, "mafft_align_input.fa")
         mafft_align(hmminput, mafft_align1)
@@ -68,14 +83,20 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
 
     else:
         verbalise("B", "Extracting sequence from %s" % genes)
+        if not isinstance(genes, list):
+            genes = [genes]
         # run phmmer on a single input gene/sequence:
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=species,
                                                     fastafile=fastafile,
                                                     specieslist=specieslist,
                                                     dbpaths=dbpaths):
-            fasta_seq = "%s\n%s\n" % (defline, seq)
+            if not seq:
+                verbalise("R", "No genes sequences were found.")
+                return {}
 
+            fasta_seq = "%s\n%s\n" % (defline, seq)
+            verbalise("C", fasta_seq)
         ## phmmer all lpep files
         homologlist = hmmer_search(fasta_seq,
                                     specieslist,
@@ -116,7 +137,12 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     all_results = {}
     filtered_results = {}
     has_bestscore = False
-    for sp in [query_species] + [ s for s in specieslist if s != query_species ]:
+    if query_species:
+        search_space = [query_species] + [ s for s in specieslist if s != query_species ]
+    else:
+        search_space = specieslist
+
+    for sp in search_space:
         try:
             phandle = os.popen( " ".join([searchcmd, hmminput, dbpaths[sp + '_lpep']]) )
         except KeyError:
@@ -133,12 +159,16 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
         elif has_bestscore:
             pass
         else:
-            bestscore = max( v[1] for v in all_results[sp].values())
+            score_list = [ v[1] for v in all_results[sp].values() ]
+            if len(score_list) > 0:
+                bestscore = max( score_list )
+            else:
+                bestscore = 0
         cutoff_thresh = minthresh * bestscore
 
         # filter local file based on parameters given:
         ars = all_results[sp]
-        filtered_results[sp] = { gene:(sp, ars[gene][1]) for i,gene in enumerate(ars) if ars[gene][1] >= cutoff_thresh or i < mincollect}
+        filtered_results[sp] = { gene:(sp, ars[gene][1], ars[gene][0]) for i,gene in enumerate(ars) if ars[gene][1] >= cutoff_thresh or i < mincollect}
 
     # filter for global threshold (ie, based on % of best match). Most useful if no
     # species has been specified for fasta file.
@@ -155,8 +185,15 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
 
 ####### RAxML functions ########
 def raxml(logfile, fastafile, bootstrap=False, threads=2,
-            name_conversion=None, verbalise=lambda *a: None, ):
-    phylip_alignment = internal.make_phylip(fastafile, logfile)
+            name_conversion=None, phylipize=True,
+            verbalise=lambda *a: None, ):
+
+    if phylipize:
+        phylip_alignment = internal.make_phylip(fastafile, logfile)
+    else:
+        phylip_alignment = fastafile
+
+    print "phylip done"
     if bootstrap:
         raxml_best = raxml_phylogeny(phylip_alignment,
                                                 logfile,
@@ -172,6 +209,7 @@ def raxml(logfile, fastafile, bootstrap=False, threads=2,
                 "Best tree with bootstrap support can be found at %s" % raxml_final)
 
     else:
+        print "Starting raxml"
         raxml_final = raxml_phylogeny(phylip_alignment,
                                                 logfile,
                                                 bootstrap=bootstrap,
@@ -186,6 +224,7 @@ def raxml(logfile, fastafile, bootstrap=False, threads=2,
 
 
 def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False, threads=2):
+    print "raxml_phylogeny"
     if threads < 2:
         verbalise("R", "Minimum number of threads allowed is 2")
         exit()
@@ -195,7 +234,7 @@ def raxml_phylogeny(phylip_alignment, logfile, bootstrap=False, threads=2):
     else:
         bootstrapopt = '-N 1'
         bs_str = ""
-
+    print "Bootstrap: ", bootstrap
     # determine path of final RAxML output file
     raxml_outfile = os.path.basename(logfile[:-3] + bs_str + 'raxml.out')
     if bootstrap:
