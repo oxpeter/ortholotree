@@ -8,6 +8,7 @@ import os
 import re
 
 from Bio import AlignIO
+from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -45,6 +46,34 @@ def trim_name_dross(genename):
         return genename
 
 ####### fasta file operations ##################
+def count_genes(genes=[], fastafile=None):
+    "evaluates the number of genes provided between a gene list and a fasta file"
+
+    if not isinstance(genes,list):
+        genes = [genes]
+    genes = [ g for g in genes if g != '' ]
+    
+    if fastafile:
+        # count number of genes provided:
+        handle = os.popen("grep -c '^>' " + fastafile)
+        result = re.search("(\d*)", handle.readline())
+        handle.close()
+        if result:
+            try:
+                genenum = int(result.group(1))
+            except ValueError:
+                genenum = 2  
+                print "ValueError calculating genenum"
+                """
+                putting one will ensure hmmer model is built if there is an error 
+                counting the number of genes in the fasta file
+                """
+        else:
+            genenum = 2
+            print "No result found for genenum"
+    return len(genes), genenum
+     
+
 def parsefasta(fastafile, verbalise=lambda *a: None):
     """
     creates a generator that yields each successive sequence and defline.
@@ -191,6 +220,15 @@ def get_pcmatch(seq):
     return width, pcmatch
 
 def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True):
+    fig = build_alignment(fastafile, conversiondic)
+    if outfile:
+        fig.savefig(outfile, format='png')
+    if showplot:
+        fig.show()
+    else:
+        fig.close()
+
+def build_alignment(fastafile, conversiondic={}, img_width=10):
     """
     Draw an alignment graph in the vein of BLAST alignment results on NCBI.
     colour scale represents the % match as base 10, to allow flooring of actual percentages
@@ -268,10 +306,15 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True):
             bh_widths.append(dists[1])
 
     # plot graph:
-    if 75 > len(keynames) > 25:
-        plt.figure(figsize=(10,10))
-    elif len(keynames) >= 75:
-        plt.figure(figsize=(10,20))
+    if 30 > len(keynames):
+        fig = plt.figure(figsize=(img_width,img_width))
+    elif 60 > len(keynames) >= 30:
+        fig = plt.figure(figsize=(img_width,img_width*2))
+    elif 90 > len(keynames) >= 60:
+        fig = plt.figure(figsize=(img_width,img_width*3))    
+    else:
+        fig = plt.figure(figsize=(img_width,img_width*4))
+        
     plt.barh(left=lefts,    width=widths,    bottom=y_pos, height=0.8, color=colors)
     plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
             alpha=0.5)
@@ -279,13 +322,8 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True):
     plt.xlabel("position (aa)")
     plt.title("Alignment of genes")
     plt.tight_layout()
+    return fig
 
-    if outfile:
-        plt.savefig(outfile, format='png')
-    if showplot:
-        plt.show()
-    else:
-        plt.close()
 
 ####### hmmer functions ########################
 
@@ -299,9 +337,13 @@ def parse_the_hmmer(handle):
     collected = 0
     for line in handle:
         lcount += 1
-        if len(line) < 2:
+        if line[0] in ['#', 'Q', 'D', 'S']:
             continue
-        if line.split()[1] in ['hits', 'inclusion', 'annotation']:
+        elif len(line) < 2:
+            continue
+        elif line[0] == '>':
+            break
+        elif line.split()[1] in ['hits', 'inclusion', 'annotation']:
             break
         else:
             try:
