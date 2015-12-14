@@ -35,6 +35,18 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
     genelist_num, fasta_num = internal.count_genes(genes, fastafile)
     verbalise("Y", "Genelist size:%d\nFasta size:%d" % (genelist_num, fasta_num ))
 
+    # if fasta files are provided, create a temp fastafile to search against with hmmer:
+    if fastafile:
+        extra_file = os.path.join(temp_dir, "query_fasta")
+        handle = open(extra_file, 'w')
+        for defline, seq in internal.parsefasta(fastafile):
+            handle.write(">%s\n%s\n" % (defline, seq))
+        handle.close()
+
+        extra_file_search = extra_file
+    else:
+        extra_file_search = None
+
     if genelist_num + fasta_num > 1:
         buildhmmer = True
 
@@ -76,7 +88,8 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
                                     hmmfile=hmmmodel,
-                                    verbalise=verbalise)
+                                    verbalise=verbalise,
+                                    extra_file_search=extra_file_search)
 
         os.remove(mafft_align1)
         os.remove(hmminput)
@@ -107,13 +120,14 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
                                     mincollect=mincollect,
                                     globalthresh=globalthresh,
                                     hmmfile=None,
-                                    verbalise=verbalise)
+                                    verbalise=verbalise,
+                                    extra_file_search=extra_file_search)
 
     return homologlist
 
 def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
                     minthresh=0.8, mincollect=2, globalthresh=0.01, hmmfile=None,
-                    verbalise=lambda *a: None):
+                    verbalise=lambda *a: None, extra_file_search=None):
     """
     HMMER search of longest non-redundant peptide fasta files using either phmmer (with
     query protein as input) or hmmersearch (using constructed hmmfile as input).
@@ -142,12 +156,19 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     else:
         search_space = specieslist
 
+    if extra_file_search:
+        search_space += [ extra_file_search ]
+
     for sp in search_space:
         try:
             phandle = os.popen( " ".join([searchcmd, hmminput, dbpaths[sp + '_lpep']]) )
         except KeyError:
-            print sp + '_lpep', "not found"
-            continue
+            try:
+                phandle = os.popen( " ".join([ searchcmd, hmminput, sp ]) )
+            except:
+                print "error:"
+                print sp + '_lpep', "not found"
+                continue
 
         # parse phmmer results:
         all_results[sp] = internal.parse_the_hmmer(phandle)
@@ -174,7 +195,10 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     # species has been specified for fasta file.
     if filtered_results == {}:
         return {}
-    bestscore = max( v[1] for s in filtered_results for v in filtered_results[s].values())
+    try:
+        bestscore = max( v[1] for s in filtered_results for v in filtered_results[s].values())
+    except ValueError:
+        bestscore = 0
     global_thresh = globalthresh * bestscore
     homologlist = { k:v for nd in filtered_results.values() for (k,v) in nd.items() if v[1] >= global_thresh }
 
