@@ -10,6 +10,8 @@ import re
 from Bio import AlignIO
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib as mpl
 import numpy as np
 
 
@@ -52,7 +54,7 @@ def count_genes(genes=[], fastafile=None):
     if not isinstance(genes,list):
         genes = [genes]
     genes = [ g for g in genes if g != '' ]
-    
+
     if fastafile:
         # count number of genes provided:
         handle = os.popen("grep -c '^>' " + fastafile)
@@ -62,17 +64,16 @@ def count_genes(genes=[], fastafile=None):
             try:
                 genenum = int(result.group(1))
             except ValueError:
-                genenum = 2  
+                genenum = 2
                 print "ValueError calculating genenum"
                 """
-                putting one will ensure hmmer model is built if there is an error 
+                putting one will ensure hmmer model is built if there is an error
                 counting the number of genes in the fasta file
                 """
         else:
             genenum = 2
             print "No result found for genenum"
     return len(genes), genenum
-     
 
 def parsefasta(fastafile, verbalise=lambda *a: None):
     """
@@ -131,7 +132,10 @@ def get_gene_fastas(genes=None, fastafile=None,
         for gene in genes:
             if species in specieslist:
                 reportedspecies = species
-                defline, seq = find_gene(dbpaths[species + '_lpep'], gene, verbalise=verbalise)
+                try:
+                    defline, seq = find_gene(dbpaths[species + '_lpep'], gene, verbalise=verbalise)
+                except KeyError:
+                    defline, seq = find_gene(species, gene, verbalise=verbalise)
                 if seq:
                     seq = seq[startpos:endpos]
 
@@ -219,8 +223,44 @@ def get_pcmatch(seq):
     pcmatch = 10.0 * matches / width
     return width, pcmatch
 
-def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True):
-    fig = build_alignment(fastafile, conversiondic)
+def consensus_pc(fastafile):
+    all_seqs = {}
+    maxlen = 0
+    for defline, seq, species in get_gene_fastas(fastafile=fastafile):
+        all_seqs[defline] = seq
+        if len(seq) > maxlen:
+            maxlen = len(seq)
+
+    consensus = {}
+    print "Max alignment sequence length = %d" % (maxlen)
+    for i in range(maxlen):
+        counts = {'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'G':0,
+                    'H':0, 'I':0, 'J':0, 'K':0, 'L':0, 'M':0, 'N':0,
+                    'O':0, 'P':0, 'Q':0, 'R':0, 'S':0, 'T':0, 'U':0,
+                    'V':0, 'W':0, 'X':0, 'Y':0, 'Z':0, '-':0, 'null':0,
+                    }
+        for d in all_seqs:
+            try:
+                counts[all_seqs[d][i].upper()] += 1
+            except KeyError:
+                counts['null'] += 1
+            except IndexError:
+                counts['null'] += 1
+
+        consensus[i] = 1.0 * max(counts.values()) / (sum(counts.values()) - counts['null'])
+    return consensus
+
+def sliding_average(float_list, window=20, window_pc=False):
+    if window_pc:
+        window = len(float_list) * window / 100
+    sliding_averages = []
+    for i in range(len(float_list)):
+        sliding_averages.append(np.mean(float_list[i:i+window]))
+    return sliding_averages
+
+def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
+                        gapthresh=0.05):
+    fig = build_alignment(fastafile, conversiondic, gapthresh=gapthresh)
     if outfile:
         fig.savefig(outfile, format='png')
     if showplot:
@@ -228,21 +268,33 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True):
     else:
         fig.close()
 
-def build_alignment(fastafile, conversiondic={}, img_width=10):
+def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05):
     """
     Draw an alignment graph in the vein of BLAST alignment results on NCBI.
     colour scale represents the % match as base 10, to allow flooring of actual percentages
     to find appropriate colour group. Key number represents the minimum value the % match
     must be to join that colour group.
     """
-    cmap = {0:'white', 1:'silver', 2:'tan' ,3:'cornflowerblue' ,4:'blue' ,5:'darkcyan' ,6:'green', 7:'gold' ,8:'orangered' ,9:'red' ,10:'maroon'}
-
+    #cmap = {0:'white', 1:'silver', 2:'tan' ,3:'cornflowerblue' ,4:'blue' ,5:'darkcyan' ,6:'green', 7:'gold' ,8:'orangered' ,9:'red' ,10:'maroon'}
+    #cmap = cm.cool
+    print "setting color maps"
+    nrml = mpl.colors.Normalize(vmin=0, vmax=1)
+    sm = plt.cm.ScalarMappable(cmap=cm.jet, norm=nrml)
+    sm._A = []
 
     graph_points = {}
     hole_points = {}
+
+    #get consensus percentages for each position:
+    cons = consensus_pc(fastafile)
+    # calculate sliding average:
+    slave = sliding_average(cons.values())
+    sliding_colors = sm.to_rgba(slave)
+
+    # find gaps:
     for defline, seq, species in get_gene_fastas(fastafile=fastafile):
         # determine the smallest reportable gap size is:
-        repgap = int(len(seq)/10)
+        repgap = int(gapthresh * len(seq))
 
         # get distances and coverage percentages
         points = re.search('^(-*)(\S+[A-Za-z])(-*)$', seq)
@@ -301,26 +353,44 @@ def build_alignment(fastafile, conversiondic={}, img_width=10):
             y_pos.append(y_frame[k])
             lefts.append(dists[2])
             widths.append(dists[3])
-            colors.append(cmap[floor(dists[4])])
+            colors.append(sm.to_rgba(dists[4]/10.0))
             bh_lefts.append(dists[0])
             bh_widths.append(dists[1])
 
     # plot graph:
-    if 30 > len(keynames):
-        fig = plt.figure(figsize=(img_width,img_width))
+    if 30 > len(keynames) :
+        fig = plt.figure(figsize=(img_width,img_width*1))
     elif 60 > len(keynames) >= 30:
         fig = plt.figure(figsize=(img_width,img_width*2))
     elif 90 > len(keynames) >= 60:
-        fig = plt.figure(figsize=(img_width,img_width*3))    
+        fig = plt.figure(figsize=(img_width,img_width*3))
     else:
-        fig = plt.figure(figsize=(img_width,img_width*4))
-        
+        fig = plt.figure(figsize=(img_width,int(len(keynames)/2.8)))
+
+    # plot alignments:
+    ax1 = plt.subplot2grid((12,10),(0,0), colspan=9, rowspan=9)
     plt.barh(left=lefts,    width=widths,    bottom=y_pos, height=0.8, color=colors)
     plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
             alpha=0.5)
     plt.yticks(name_pos + 0.4, keynames)
     plt.xlabel("position (aa)")
-    plt.title("Alignment of genes")
+    plt.title("Gaps in alignment (%)")
+    plt.tight_layout()
+
+    # plot legend:
+    ax2 = plt.subplot2grid((12,10),(0,9), colspan=1,rowspan=5)
+    cb1 = mpl.colorbar.ColorbarBase(ax2, cmap=cm.jet, norm=nrml, orientation='vertical')
+    plt.tight_layout()
+
+    # plot consensus colors:
+    ax3 = plt.subplot2grid((12,10),(9,0), colspan=9,rowspan=2)
+    size = len(slave)
+    plt.barh(left=range(size), bottom=[1]*size,
+                height=[0.8]*size, width=[1]*size,
+                color=sliding_colors,
+                edgecolor=sliding_colors,)
+    plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
+    plt.xlabel("25 aa sliding average consensus (%)")
     plt.tight_layout()
     return fig
 
