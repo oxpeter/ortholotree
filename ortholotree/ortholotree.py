@@ -59,6 +59,10 @@ def define_arguments():
     parser.add_argument("-t", "--scorethresh", type=float, default=0.5,
                         help="""minimum fraction of the score of the best matching
                         gene for a species for including additional matches""")
+    parser.add_argument("--gapthresh", type=float, default=0.05,
+                        help="""size, as a fraction of the alignment length, which an
+                        alignment gap must be before being displayed on the alignment
+                        summary plot. [ default = 0.05 ]""")
     parser.add_argument("-p", "--threads", type=int, default=2,
                         help="number of threads to use for RAxML calculations")
     parser.add_argument("-b", "--bootstrap", type=int,
@@ -69,20 +73,22 @@ def define_arguments():
     parser.add_argument("-R", "--raxml_only", action='store_true',
                         help="""Construct phylogeny using RAxML using fasta alignment
                         provided in fasta file """)
+    parser.add_argument("-P", '--phylipize', action='store_true',
+                        help="""shorten the names to be compatible with Phylip format""")
     parser.add_argument("-x", "--exclude_genes", type=str,
                         help="""A comma-separated list of genes to exclude from the
                         alignment and phylogeny""")
     parser.add_argument("-e", "--exclude_species", type=str,
                         help="""A comma-separated list of species to exclude from the
                         alignment and phylogeny. Use the four-letter abbreviation.""")
-    parser.add_argument("-l", "--maxlength", type=int,
+    parser.add_argument("-l", "--maxlength", type=int, default=100000,
                         help="""If provided, will remove all genes longer than this
                         size. Useful for removing concatenated genes that otherwise
                         are orthologous. It is not recommended that you use this
                         flag until you have looked at your results without it, and
                         preferably tried to eliminate long genes by using better search
                         models.""")
-    parser.add_argument("-m", "--minlength", type=int,
+    parser.add_argument("-m", "--minlength", type=int, default=0,
                         help="""If provided, will remove all genes shorter than this
                         size. It is not recommended that you use this
                         flag until you have looked at your results without it, and
@@ -91,6 +97,15 @@ def define_arguments():
 
     return parser
 
+def sequence_filter(seq, max=100000, min=0):
+    if not seq:
+        return True
+    # filter based on size:
+    if len(seq) > max:
+        return True
+    if len(seq) < min:
+        return True
+    return False
 
 ############################################################################
 
@@ -106,10 +121,14 @@ if __name__ == '__main__':
     temp_dir = tempfile.mkdtemp()
 
     # initialise dictionary of all accessible longest non-redundant peptide fasta files
-    specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros", "Bimp", "Bmor",
-                "Bter", "Cele", "Cflo", "Csol", "Dcit", "Fari", "Hsal", "Lhum",
-                "Mdem", "Mpha", "Mrot", "Nvit", "Oabi", "Pbar", "Pcan", "Sinv",
-                "Tcas", "Waur", "Cbir", "Ebur", "Dmel" ]
+    specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros",
+                "Bimp", "Bdor", "Bmor", "Bter",
+                "Ccap", "Cele", "Cflo", "CoFl", "Csol", "Cbir",
+                "Dcit", "Dqua", "Dmel",
+                "Ebur", "Fari", "Hsal", "Lhum",
+                "Mdem", "Mpha", "Mrot", "Nvit", "Oabi",
+                "Pbar", "Pcan", "Pmac", "Sinv",
+                "Tcas", "Tpre", "Waur", "Veme", ]
 
 
     if args.threads < 2:
@@ -125,7 +144,7 @@ if __name__ == '__main__':
         verbalise("B", "Running RAxML analysis to construct phylogeny using supplied alignment")
         final_tree = external.raxml(logfile, args.fasta, bootstrap=args.bootstrap,
                         threads=args.threads, name_conversion=args.name_conversion,
-                        verbalise=verbalise)
+                        verbalise=verbalise, phylipize=args.phylipize)
         exit()
 
     ######### Get protein sequences #########
@@ -152,6 +171,13 @@ if __name__ == '__main__':
     excluded_genes = config.make_a_list(args.exclude_genes)
     excluded_species = config.make_a_list(args.exclude_species)
 
+    # place any sequences provided in the input into the seqdic
+    for defline, seq in internal.parsefasta(args.fasta):
+        if sequence_filter(seq, args.maxlength, args.minlength):
+            continue
+        else:
+            seqdic[seq] = defline
+
     for homolog in sorted(homologlist):
         # remove excluded genes before bothering to look up their sequence:
         searchname = internal.trim_name_dross(homolog)
@@ -170,15 +196,11 @@ if __name__ == '__main__':
                                     specieslist = specieslist,
                                     comment=homologlist[homolog][1],
                                     short=itercount):
-            if not seq:
-                continue
-            # filter based on size:
-            if args.maxlength and len(seq) > args.maxlength:
-                continue
-            if args.minlength and len(seq) < args.minlength:
-                continue
 
-            seqdic[seq] = defline
+            if sequence_filter(seq, args.maxlength, args.minlength):
+                continue
+            else:
+                seqdic[seq] = defline
 
         shortname = internal.phylipise(homologlist[homolog][0], itercount)
         conv_handle.write("%s %-5d %s\n" % (shortname,
@@ -212,7 +234,8 @@ if __name__ == '__main__':
     internal.display_alignment(mafft_alignment,
                         conversiondic=conv_dic,
                         outfile=logfile[:-3] + 'mafft.png',
-                        showplot=args.display_on)
+                        showplot=args.display_on,
+                        gapthresh = args.gapthresh)
 
     ######### RaXML phylogenetic analysis of alignment #########
     """
