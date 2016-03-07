@@ -42,6 +42,7 @@ def make_phylip(fastaalignment, logfile):
     return phylip_alignment
 
 def trim_name_dross(genename):
+    return genename.replace("|", "\|")
     if genename.find('|') >= 0:
         return genename[genename.find('|')+1:]
     else:
@@ -108,10 +109,36 @@ def is_validfasta(seq, verbalise=lambda *a: None):
 def find_gene(fastafile, gene, verbalise=lambda *a: None):
     genename = trim_name_dross(gene)
     for defline, seq in parsefasta(fastafile):
-        if re.search( '[^\w]' + genename + '(\s.*)?$', defline):  #  '[\s\|\$]'
+        if re.search( '(\W)?' +  genename + '([\W\s].*)?$', defline):  #  '[\s\|\$]'
             return defline, seq
     else:
         return None, None
+
+def find_genes(fastafiles, genes, verbalise=lambda *a: None):
+    """
+    This function allows extraction of multiple genes, hopefully to speed up large
+    iterative searches that relied on the older find_gene function.
+    NB: this function must return a different format than the old one, as it is dealing
+    with multiple genes. It therefore returns a dictionary keyed by defline.
+
+    The iterations will stop as soon as the number of entries saved in the dictionary
+    is the same as the number of entries provided. If it reaches the end of the file, then
+    it will return the dictionary as it stands (which may be empty, if no matches were
+    found).
+    """
+    genedic = {}
+    genenames = [ trim_name_dross(gene) for gene in genes ]
+    if isinstance(fastafiles, str):
+            fastafiles = [fastafiles]
+    for fastafile in fastafiles:
+        for defline, seq in parsefasta(fastafile):
+            for g in genenames:
+                if re.search( '(\W)?' +  g + '([\W\s].*)?$', defline):  #  '[\s\|\$]'
+                    genedic[defline] = seq
+                    if len(genedic) == len(genenames):
+                        return genedic
+        else:
+            return genedic
 
 def get_gene_fastas(genes=None, fastafile=None,
                     startpos=0, endpos=None,
