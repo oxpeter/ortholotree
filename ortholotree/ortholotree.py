@@ -33,7 +33,7 @@ def define_arguments():
     parser.add_argument("-f", "--fasta", type=str,
                         help="Fasta file of gene to analyse (must be amino acids)")
     parser.add_argument("-g", "--gene", type=str,
-                        help="""Gene or transcript name. This name will be checked
+                        help="""Gene or transcript name(s). This name will be checked
                         against the peptide database to see if there is a match.""")
     parser.add_argument("-s", "--species", type=str, default="",
                         help="""Four letter abbreviation of species, to speed up
@@ -94,7 +94,9 @@ def define_arguments():
                         flag until you have looked at your results without it, and
                         preferably tried to eliminate short genes by using better search
                         models.""")
-
+    parser.add_argument("-E", "--extract_fasta", action='store_true',
+                        help="""extract fasta sequences of specified genes from fastafile
+                        and output as separate fastafile""")
     return parser
 
 def sequence_filter(seq, max=100000, min=0):
@@ -123,11 +125,11 @@ if __name__ == '__main__':
     # initialise dictionary of all accessible longest non-redundant peptide fasta files
     specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros",
                 "Bimp", "Bdor", "Bmor", "Bter",
-                "Ccap", "Cele", "Cflo", "CoFl", "Csol", "Cbir",
-                "Dcit", "Dqua", "Dmel",
+                "Ccap", "Cele", "Cflo", "CoFl", "Csol", "Cbir", "Ccin",
+                "Dcit", "Dqua", "Dmel", "Dall", "Dnov",
                 "Ebur", "Fari", "Hsal", "Lhum",
-                "Mdem", "Mpha", "Mrot", "Nvit", "Oabi",
-                "Pbar", "Pcan", "Pmac", "Sinv",
+                "Mdem", "Mpha", "Mrot", "Nvit", "Nlec", "Oabi",
+                "Pbar", "Pcan", "Pdom", "Pmac", "Sinv",
                 "Tcas", "Tpre", "Waur", "Veme", ]
 
 
@@ -149,6 +151,15 @@ if __name__ == '__main__':
 
     ######### Get protein sequences #########
     genes = config.make_a_list(args.gene)
+
+    ######### If extract sequences is selected ############
+    if args.extract_fasta:
+        handle = open(logfile[:-3] + "fa", 'w')
+        for defline, seq in internal.find_genes(args.fasta, genes, verbalise).items():
+            handle.write("%s\n%s\n" % (defline, seq))
+        handle.close()
+        exit()
+
     homologlist = external.get_similar_sequences(temp_dir,
                                         buildhmmer=args.buildhmmer,
                                         fastafile=args.fasta,
