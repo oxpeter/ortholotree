@@ -150,7 +150,7 @@ if __name__ == '__main__':
         exit()
 
     ######### Get protein sequences #########
-    genes = config.make_a_list(args.gene)
+    genes = config.make_a_list(args.gene).keys()
 
     ######### If extract sequences is selected ############
     if args.extract_fasta:
@@ -183,11 +183,12 @@ if __name__ == '__main__':
     excluded_species = config.make_a_list(args.exclude_species)
 
     # place any sequences provided in the input into the seqdic
-    for defline, seq in internal.parsefasta(args.fasta):
-        if sequence_filter(seq, args.maxlength, args.minlength):
-            continue
-        else:
-            seqdic[seq] = defline
+    if args.fasta:
+        for defline, seq in internal.parsefasta(args.fasta):
+            if sequence_filter(seq, args.maxlength, args.minlength):
+                continue
+            else:
+                seqdic[seq] = defline
 
     for homolog in sorted(homologlist):
         # remove excluded genes before bothering to look up their sequence:
@@ -205,8 +206,8 @@ if __name__ == '__main__':
                                     fastafile=None,
                                     dbpaths=dbpaths,
                                     specieslist = specieslist,
-                                    comment=homologlist[homolog][1],
-                                    short=itercount):
+                                    comment=str(homologlist[homolog][1]) + str(itercount),
+                                    short=False):
 
             if sequence_filter(seq, args.maxlength, args.minlength):
                 continue
@@ -227,6 +228,7 @@ if __name__ == '__main__':
     handle = open(homolog_fasta, 'w')
     for seq in seqdic:
         fastaseq = "%s\n%s\n" % (seqdic[seq], seq)
+
         handle.write(fastaseq)
     handle.close()
 

@@ -51,7 +51,7 @@ def trim_name_dross(genename):
 ####### fasta file operations ##################
 def count_genes(genes=[], fastafile=None):
     "evaluates the number of genes provided between a gene list and a fasta file"
-
+    genenum = 0
     if not isinstance(genes,list):
         genes = [genes]
     genes = [ g for g in genes if g != '' ]
@@ -126,10 +126,12 @@ def find_genes(fastafiles, genes, verbalise=lambda *a: None):
     it will return the dictionary as it stands (which may be empty, if no matches were
     found).
     """
+
     genedic = {}
     genenames = [ trim_name_dross(gene) for gene in genes ]
     if isinstance(fastafiles, str):
-            fastafiles = [fastafiles]
+        fastafiles = [fastafiles]
+
     for fastafile in fastafiles:
         for defline, seq in parsefasta(fastafile):
             for g in genenames:
@@ -137,8 +139,8 @@ def find_genes(fastafiles, genes, verbalise=lambda *a: None):
                     genedic[defline] = seq
                     if len(genedic) == len(genenames):
                         return genedic
-        else:
-            return genedic
+    else:
+        return genedic
 
 def get_gene_fastas(genes=None, fastafile=None,
                     startpos=0, endpos=None,
@@ -152,10 +154,25 @@ def get_gene_fastas(genes=None, fastafile=None,
 
     if genes:
         if dbpaths=={} or specieslist == []:
+            verbalise("R", "No database or specieslist provided :(")
             yield None, None, None
             raise StopIteration
-        if isinstance(genes, str):
-            genes = [genes]
+
+        # extract all sequences:
+        if species in specieslist:
+            reportedspecies = species
+            try:
+                seqdic = find_genes(dbpaths[species + '_lpep'], genes, verbalise=verbalise)
+            except KeyError:
+                seqdic = find_genes(species, gene, verbalise=verbalise)
+
+        else:
+            seqdic = find_genes([dbpaths[sp + '_lpep'] for sp in specieslist],
+                                genes,
+                                verbalise=verbalise)
+
+        """
+        # the old code:
         for gene in genes:
             if species in specieslist:
                 reportedspecies = species
@@ -184,16 +201,21 @@ def get_gene_fastas(genes=None, fastafile=None,
                     verbalise("R",
                         "Transcript %s (%s) could not be found in the database." % (gene, species))
                     defline, seq, reportedspecies = None, None, None
+            """
 
+
+
+
+        for defline, seq in seqdic.items():
             # create fasta file from extracted sequence:
             if seq:
                 if short:
-                    name = phylipise(reportedspecies, short)
-                    defline = ">%s (%s) %s" % (name, reportedspecies, comment)
+                    name = phylipise(defline, short)
+                    defline = ">%s %s" % (name, comment)
                 else:
-                    defline = ">%s (%s) %s" % (gene, reportedspecies, comment)
+                    defline = "%s %s" % (defline, comment)
 
-            yield defline, seq, reportedspecies
+                yield defline, seq[startpos:endpos], None
 
     if fastafile:
         for defline, seq in parsefasta(fastafile, verbalise=verbalise):
@@ -293,7 +315,7 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
     if showplot:
         fig.show()
     else:
-        fig.close()
+        plt.close()
 
 def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05):
     """
@@ -357,7 +379,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05):
             dists = [(0,0,0,1,0)]
 
         # get name (convert if possible):
-        namesearch = re.search('>(\S+)', defline)
+        namesearch = re.search('>+(\S+)', defline)
         if namesearch:
             genename = namesearch.group(1)
         else:

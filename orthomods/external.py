@@ -55,18 +55,20 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
         handle = open(hmminput, 'w')
         seqcount = 0
         verbalise("B", "Extracting sequence data from %d peptides" % len(genes))
+
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=None,
                                                     fastafile=fastafile,
                                                     specieslist=specieslist,
                                                     dbpaths=dbpaths):
+
             if seq:
                 seqcount += 1
                 fasta_seq = "%s\n%s\n" % (defline, seq)
                 handle.write(fasta_seq)
         handle.close()
         if seqcount == 0:
-            verbalise("R", "No genes sequences were found.")
+            verbalise("R", "No gene sequences were found.")
             return {}
         # create alignment of input sequences:
         mafft_align1 = os.path.join(temp_dir, "mafft_align_input.fa")
@@ -209,21 +211,21 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
 
 ####### RAxML functions ########
 def raxml(logfile, fastafile, bootstrap=False, threads=2,
-            name_conversion=None, phylipize=True,
+            name_conversion=None, phylipize=False,
             verbalise=lambda *a: None, ):
 
     if phylipize:
-        phylip_alignment = internal.make_phylip(fastafile, logfile)
+        alignment = internal.make_phylip(fastafile, logfile)
     else:
-        phylip_alignment = fastafile
+        alignment = fastafile
 
     print "phylip done"
     if bootstrap:
-        raxml_best = raxml_phylogeny(phylip_alignment,
+        raxml_best = raxml_phylogeny(alignment,
                                                 logfile,
                                                 bootstrap=False,
                                                 threads=threads)
-        raxml_bstrap = raxml_phylogeny(phylip_alignment,
+        raxml_bstrap = raxml_phylogeny(alignment,
                                                 logfile,
                                                 bootstrap=bootstrap,
                                                 threads=threads)
@@ -234,10 +236,10 @@ def raxml(logfile, fastafile, bootstrap=False, threads=2,
 
     else:
         print "Starting raxml"
-        raxml_final = raxml_phylogeny(phylip_alignment,
-                                                logfile,
-                                                bootstrap=bootstrap,
-                                                threads=threads)
+        raxml_final = raxml_phylogeny(alignment,
+                                        logfile,
+                                        bootstrap=bootstrap,
+                                        threads=threads)
         verbalise("Y", "Best tree can be found at %s" % raxml_final)
     if name_conversion:
         handle = open(name_conversion, 'rb')
