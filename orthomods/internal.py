@@ -41,7 +41,7 @@ def make_phylip(fastaalignment, logfile):
 
     return phylip_alignment
 
-def trim_name_dross(genename):
+def fix_leaky_pipes(genename):
     return genename.replace("|", "\|")
     if genename.find('|') >= 0:
         return genename[genename.find('|')+1:]
@@ -121,7 +121,7 @@ def is_validfasta(seq, verbalise=lambda *a: None):
         return True
 
 def find_gene(fastafile, gene, verbalise=lambda *a: None):
-    genename = trim_name_dross(gene)
+    genename = fix_leaky_pipes(gene)
     for defline, seq in parsefasta(fastafile):
         if re.search( '(\W)?' +  genename + '([\W\s].*)?$', defline):  #  '[\s\|\$]'
             return defline, seq
@@ -142,7 +142,7 @@ def find_genes(fastafiles, genes, verbalise=lambda *a: None):
     """
 
     genedic = {}
-    genenames = [ trim_name_dross(gene) for gene in genes ]
+    genenames = [ fix_leaky_pipes(gene) for gene in genes ]
     if isinstance(fastafiles, str):
         fastafiles = [fastafiles]
 
