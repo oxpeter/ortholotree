@@ -64,26 +64,27 @@ class TestGetGeneFastas(FastaTestCase):
         for defline, seq, species in internal.get_gene_fastas(genes=['NP_001035293.1'],
                                                         dbpaths=self.dbpaths,
                                                         specieslist=self.specieslist):
-            self.assertEqual(defline, '>NP_001035293.1 (Amel) None')
+            self.assertEqual(defline, '>Amel|NP_001035293.1')
             self.assertEqual(seq,
 'MPILIPHRNPASANYYENKDGARIVKASHFELDYMLGRKITFFCMATGFPRPEITWLKDGIELYHHKFFQVHEWPVGNDTLKSKMEIDPATQKDAGYYECQADNQYAVDRRGFRTDYVMISY')
-            self.assertEqual(species, 'Amel')
+            self.assertEqual(species, None)
 
     def test_nogenelist(self):
         for defline, seq, species in internal.get_gene_fastas(genes='NP_001035293.1',
                                                         dbpaths=self.dbpaths,
                                                         specieslist=self.specieslist):
-            self.assertEqual(defline, '>NP_001035293.1 (Amel) None')
+            self.assertEqual(defline, '>Amel|NP_001035293.1')
             self.assertEqual(seq,
 'MPILIPHRNPASANYYENKDGARIVKASHFELDYMLGRKITFFCMATGFPRPEITWLKDGIELYHHKFFQVHEWPVGNDTLKSKMEIDPATQKDAGYYECQADNQYAVDRRGFRTDYVMISY')
-            self.assertEqual(species, 'Amel')
+            self.assertEqual(species, None)
 
-    def test_incompletegenenamebeginning(self):
-        for defline, seq, species in internal.get_gene_fastas(genes=['001035293.1'],
+    def test_duplicate_matches(self):
+        for defline, seq, species in internal.get_gene_fastas(genes=['XP','XP_006570708.1'],
                                                         dbpaths=self.dbpaths,
                                                         specieslist=self.specieslist):
-            self.assertEqual(defline, None)
-            self.assertEqual(seq, None)
+            self.assertEqual(defline, '>Amel|XP_006570708.1')
+            self.assertEqual(seq,
+            'MEIAASAMLDGLKNNRISKLALSRFLSQSLVSCILLGLLLEFRAQLETTGSPANKPASSASGSGTGGTSGTSVGANNLTTSGIATGSSGSGSGATVSGIGTVNAGSSGINIGANVGTGNVASGTVESRTSTIGVQNKQLQNVKGEHPSKAFLQNRSMSLVDMYIDNSEPSENVGQIHFSLEYDFQNTTLILRIIQGKDLPAKDLSGTSDPYVRVTLLPDKKHRLETKIKRRTLNPRWNETFYFEGFPIQKLQSRVLHLHVFDYDRFSRDDSIGEMFLPLCQVDFSDKPSFWKALKPPAKDKCGELLCSLCYHPSNSVLTLTLLKARNLKAKDINGKSDPYVKVWLQFGDKRIEKRKTPIFKCTLNPVFNEAFSFNVPWEKIRECSLDVMVMDFDNIGRNELIGRIQLAGKNGSGASETKHWQDMITKPRQTIVQWHRLKPE' )
             self.assertEqual(species, None)
 
     def test_incompletegenenameend(self):
@@ -105,21 +106,19 @@ class TestGetGeneFastas(FastaTestCase):
                                                         dbpaths=self.dbpaths,
                                                         specieslist=self.specieslist,
                                                         species='Amel'):
-            self.assertEqual(defline, '>NP_001035293.1 (Amel) None')
+            self.assertEqual(defline, '>Amel|NP_001035293.1')
             self.assertEqual(seq,
 'MPILIPHRNPASANYYENKDGARIVKASHFELDYMLGRKITFFCMATGFPRPEITWLKDGIELYHHKFFQVHEWPVGNDTLKSKMEIDPATQKDAGYYECQADNQYAVDRRGFRTDYVMISY')
-            self.assertEqual(species, 'Amel')
+            self.assertEqual(species, None)
 
-
-class TestTrimNameDross(unittest.TestCase):
-    def test_namewithpipe_trimmed(self):
-        self.assertEqual(internal.trim_name_dross('Cbir|LOC12345'),
-                                'LOC12345')
+class TestFixLeakyPipes(unittest.TestCase):
+    def test_namewithpipe_fixed(self):
+        self.assertEqual(internal.fix_leaky_pipes('Cbir|LOC12345'),
+                                'Cbir\|LOC12345')
 
     def test_namewithoutpipe_maintained(self):
-        self.assertEqual(internal.trim_name_dross('CbirLOC12345'),
+        self.assertEqual(internal.fix_leaky_pipes('CbirLOC12345'),
                                 'CbirLOC12345')
-
 
 class TestPCmatch(unittest.TestCase):
     def test_pcmatch100(self):
