@@ -43,10 +43,6 @@ def make_phylip(fastaalignment, logfile):
 
 def fix_leaky_pipes(genename):
     return genename.replace("|", "\|")
-    if genename.find('|') >= 0:
-        return genename[genename.find('|')+1:]
-    else:
-        return genename
 
 def remove_illegal_characters(defline):
     """RaXML does not allow certain characters in the taxon name (as determined by the
