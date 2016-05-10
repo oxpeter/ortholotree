@@ -101,17 +101,19 @@ def get_similar_sequences(temp_dir, buildhmmer=False, fastafile=None,
         if not isinstance(genes, list):
             genes = [genes]
         # run phmmer on a single input gene/sequence:
+        seq = ""
         for defline, seq, species in internal.get_gene_fastas(genes=genes,
                                                     species=species,
                                                     fastafile=fastafile,
                                                     specieslist=specieslist,
                                                     dbpaths=dbpaths):
-            if not seq:
-                verbalise("R", "No genes sequences were found.")
-                return {}
 
             fasta_seq = "%s\n%s\n" % (defline, seq)
             verbalise("C", fasta_seq)
+
+        if not seq:
+            verbalise("R", "No genes sequences were found.")
+            return {}
         ## phmmer all lpep files
         homologlist = hmmer_search(fasta_seq,
                                     specieslist,

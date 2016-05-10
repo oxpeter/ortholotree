@@ -125,10 +125,10 @@ if __name__ == '__main__':
     # initialise dictionary of all accessible longest non-redundant peptide fasta files
     specieslist = [ "Ador", "Aech", "Aflo", "Amel", "Apis", "Aros",
                 "Bimp", "Bdor", "Bmor", "Bter",
-                "Ccap", "Cele", "Cflo", "CoFl", "Csol", "Cbir", "Ccin",
+                "Ccap", "Cele", "Cflo", "CoFl", "Csol", "Cbir", "Ccin", "Cpla",
                 "Dcit", "Dqua", "Dmel", "Dall", "Dnov",
                 "Ebur", "Fari", "Hsal", "Lhum",
-                "Mdem", "Mpha", "Mrot", "Nvit", "Nlec", "Oabi",
+                "Mdem", "Mpha", "Mrot", "Nvit", "Nlec", "Oabi", "Orug",
                 "Pbar", "Pcan", "Pdom", "Pmac", "Sinv",
                 "Tcas", "Tpre", "Waur", "Veme", ]
 
@@ -212,7 +212,7 @@ if __name__ == '__main__':
             if sequence_filter(seq, args.maxlength, args.minlength):
                 continue
             else:
-                seqdic[seq] = defline
+                seqdic[seq] = internal.remove_illegal_characters(defline)
 
         shortname = internal.phylipise(homologlist[homolog][0], itercount)
         conv_handle.write("%s %-5d %s\n" % (shortname,

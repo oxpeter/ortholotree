@@ -48,6 +48,20 @@ def trim_name_dross(genename):
     else:
         return genename
 
+def remove_illegal_characters(defline):
+    """RaXML does not allow certain characters in the taxon name (as determined by the
+    defline in the fasta file). This function takes the first whitespace separated
+    'word', and converts all remaining illegal characters into underscores."""
+    illegal_chars = [":", ",", ")", "(", ";", "]", "[", "'" ]
+    if re.match(">", defline):
+        newname = defline[1:].split()[0]
+    else:
+        newname = defline.split()[0]
+
+    for char in illegal_chars:
+        newname = newname.replace(char, "_")
+    return newname
+
 ####### fasta file operations ##################
 def count_genes(genes=[], fastafile=None):
     "evaluates the number of genes provided between a gene list and a fasta file"
@@ -99,7 +113,7 @@ def parsefasta(fastafile, verbalise=lambda *a: None):
 def is_validfasta(seq, verbalise=lambda *a: None):
     if len(seq) == 0:
         return False
-    badcharacters = re.findall('[\(\)\!\@\#\$\%\^\&\*\>\<\\\|\/\:\;]',seq)
+    badcharacters = re.findall('[\(\)\!\@\#\$\%\^\&\>\<\\\|\/\:\;]',seq)
     if badcharacters:
         verbalise("R", "Invalid characters found in fastafile: %s" % " ".join(set(badcharacters)))
         return False
@@ -164,47 +178,12 @@ def get_gene_fastas(genes=None, fastafile=None,
             try:
                 seqdic = find_genes(dbpaths[species + '_lpep'], genes, verbalise=verbalise)
             except KeyError:
-                seqdic = find_genes(species, gene, verbalise=verbalise)
+                seqdic = find_genes(species, genes, verbalise=verbalise)
 
         else:
             seqdic = find_genes([dbpaths[sp + '_lpep'] for sp in specieslist],
                                 genes,
                                 verbalise=verbalise)
-
-        """
-        # the old code:
-        for gene in genes:
-            if species in specieslist:
-                reportedspecies = species
-                try:
-                    defline, seq = find_gene(dbpaths[species + '_lpep'], gene, verbalise=verbalise)
-                except KeyError:
-                    defline, seq = find_gene(species, gene, verbalise=verbalise)
-                if seq:
-                    seq = seq[startpos:endpos]
-
-                    if len(seq) == 0:
-                        verbalise("R",
-                            "Transcript %s (%s) could not be found in the database." % (gene, species))
-                        defline, seq, reportedspecies = None, None, None
-
-            else:   # if no species is given, check all peptide files in dbpaths
-                for sp in specieslist:
-                    seq = ""
-                    defline, seq = find_gene(dbpaths[sp + '_lpep'], gene, verbalise=verbalise)
-                    if seq:
-                        seq = seq[startpos:endpos]
-                        if len(seq) > 0:   # found a match!
-                            reportedspecies = sp
-                            break
-                else:
-                    verbalise("R",
-                        "Transcript %s (%s) could not be found in the database." % (gene, species))
-                    defline, seq, reportedspecies = None, None, None
-            """
-
-
-
 
         for defline, seq in seqdic.items():
             # create fasta file from extracted sequence:
