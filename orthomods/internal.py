@@ -296,12 +296,14 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
     else:
         plt.close()
 
-def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05):
+def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
+                    truncate_name=False):
     """
     Draw an alignment graph in the vein of BLAST alignment results on NCBI.
-    colour scale represents the % match as base 10, to allow flooring of actual percentages
-    to find appropriate colour group. Key number represents the minimum value the % match
-    must be to join that colour group.
+    colour scale represents the percentage of alignment positions filled with actual
+    sequence, but does not represent the fit of that alignment. This is indicated by
+    adding a consensus bar at the bottom - high consensus meaning most amino acids/base
+    pairs are identical in a given sliding window.
     """
     #cmap = {0:'white', 1:'silver', 2:'tan' ,3:'cornflowerblue' ,4:'blue' ,5:'darkcyan' ,6:'green', 7:'gold' ,8:'orangered' ,9:'red' ,10:'maroon'}
     #cmap = cm.cool
@@ -368,7 +370,12 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05):
         else:
             fullname = genename
 
-        graph_points[fullname] = dists
+        if truncate_name and len(fullname) > 11:
+            graphingname = "...".join([genename[:6],genename[-5:]])
+        else:
+            graphingname = fullname
+
+        graph_points[graphingname] = dists
 
     # get coords for alignment:
     keynames = sorted(graph_points.keys(), reverse=True)
