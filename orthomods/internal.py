@@ -135,21 +135,45 @@ def find_genes(fastafiles, genes, verbalise=lambda *a: None):
     is the same as the number of entries provided. If it reaches the end of the file, then
     it will return the dictionary as it stands (which may be empty, if no matches were
     found).
+
+    the duplicates feature has only limited insurance - it will only flag duplicates found
+    while still searching through the fasta files, but because the search ends once the
+    size of the dictionary matches the number of genes requested, any duplicates that
+    exist AFTER the last sequence parsed will not be identified as duplicates.
     """
 
-    genedic = {}
+
+
+    if isinstance(genes, str):
+        genes = [genes]
     genenames = [ fix_leaky_pipes(gene) for gene in genes ]
+
     if isinstance(fastafiles, str):
         fastafiles = [fastafiles]
 
+    dup_idx = {}
+    duplicates = []  # to store genenames that are found more than once
+    genedic = {}
     for fastafile in fastafiles:
         for defline, seq in parsefasta(fastafile):
             for g in genenames:
                 if re.search( '(\W)?' +  g + '([\W\s].*)?$', defline):  #  '[\s\|\$]'
+
+                    # duplicate insurance check:
+                    if g in dup_idx:
+                        duplicates.append(g)
+                        dup_idx[g].append(defline)
+                    else:
+                        dup_idx[g] = [defline]
+
                     genedic[defline] = seq
                     if len(genedic) == len(genenames):
                         return genedic
     else:
+        # remove duplicates that were found:
+        for g in duplicates:
+            for defline in dup_idx[g]:
+                del genedic[defline]
         return genedic
 
 def get_gene_fastas(genes=None, fastafile=None,
@@ -160,6 +184,10 @@ def get_gene_fastas(genes=None, fastafile=None,
     """
     Can either be given as a transcript name to be searched within the peptide databases,
     or can be a fasta file.
+
+    Function used to return the species as the third element in the tuple, but no longer
+    does so. The third None still exists so the dependent functions don't break. This will
+    hopefully be removed in a future upgrade.
     """
 
     if genes:
@@ -187,8 +215,10 @@ def get_gene_fastas(genes=None, fastafile=None,
                 if short:
                     name = phylipise(defline, short)
                     defline = ">%s %s" % (name, comment)
-                else:
+                elif comment:
                     defline = "%s %s" % (defline, comment)
+                else:
+                    defline = "%s" % (defline)
 
                 yield defline, seq[startpos:endpos], None
 
