@@ -278,6 +278,7 @@ def get_pcmatch(seq):
     return width, pcmatch
 
 def consensus_pc(fastafile):
+    # collect all sequences and find longest:
     all_seqs = {}
     maxlen = 0
     for defline, seq, species in get_gene_fastas(fastafile=fastafile):
@@ -285,6 +286,7 @@ def consensus_pc(fastafile):
         if len(seq) > maxlen:
             maxlen = len(seq)
 
+    # iterate through each position and get percentage of highest represented marker
     consensus = {}
     print "Max alignment sequence length = %d" % (maxlen)
     for i in range(maxlen):
@@ -301,7 +303,11 @@ def consensus_pc(fastafile):
             except IndexError:
                 counts['null'] += 1
 
-        consensus[i] = 1.0 * max(counts.values()) / (sum(counts.values()) - counts['null'])
+        gaps = counts['-']
+        del counts['-']
+        nulls = counts['null']
+        del counts['null']
+        consensus[i] = 1.0 * max(counts.values()) / (sum(counts.values()))
     return consensus
 
 def sliding_average(float_list, window=20, window_pc=False):

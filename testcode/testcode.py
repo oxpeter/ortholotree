@@ -29,6 +29,7 @@ class FastaTestCase(unittest.TestCase):
         self.fastafile = resource_filename('testcode', 'fasta_eg1.txt')
         self.fastafileillegal = resource_filename('testcode', 'fasta_eg3.txt')
         self.fastafiletwo = resource_filename('testcode', 'fasta_eg2.txt')
+        self.fastaalignment = resource_filename('testcode', 'fasta_alignment_eg5.txt')
         self.dbpaths = {'Amel_lpep':resource_filename('testcode', 'Amel_longest_pep.txt'),
                         'Cbir_lpep':resource_filename('testcode', 'Cbir_longest_pep.txt')}
         self.specieslist = ['Cbir', 'Amel']
@@ -110,6 +111,15 @@ class TestGetGeneFastas(FastaTestCase):
             self.assertEqual(seq,
 'MPILIPHRNPASANYYENKDGARIVKASHFELDYMLGRKITFFCMATGFPRPEITWLKDGIELYHHKFFQVHEWPVGNDTLKSKMEIDPATQKDAGYYECQADNQYAVDRRGFRTDYVMISY')
             self.assertEqual(species, None)
+
+class TestAlignments(FastaTestCase):
+    def test_consensus_creation(self):
+        consensus = internal.consensus_pc(self.fastaalignment)
+        self.assertEqual(len(consensus), 7)
+        self.assertEqual(consensus[0], 0.5)
+        self.assertEqual(consensus[1], 1.0)
+        self.assertEqual(consensus[2], 0.5)
+        self.assertEqual(consensus[4], 0.1)
 
 class TestFixLeakyPipes(unittest.TestCase):
     def test_namewithpipe_fixed(self):
