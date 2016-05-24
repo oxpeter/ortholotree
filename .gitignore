@@ -2,3 +2,7 @@
 data/*.cfg
 build/
 *.pyc
+._*
+.DS_Store
+.gitignore
+
