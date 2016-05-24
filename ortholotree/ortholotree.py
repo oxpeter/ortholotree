@@ -192,7 +192,7 @@ if __name__ == '__main__':
 
     for homolog in sorted(homologlist):
         # remove excluded genes before bothering to look up their sequence:
-        searchname = internal.trim_name_dross(homolog)
+        searchname = internal.fix_leaky_pipes(homolog)
         if searchname in excluded_genes:
             continue
         if homologlist[homolog][0] in excluded_species:
