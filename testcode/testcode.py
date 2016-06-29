@@ -114,12 +114,19 @@ class TestGetGeneFastas(FastaTestCase):
 
 class TestAlignments(FastaTestCase):
     def test_consensus_creation(self):
-        consensus = internal.consensus_pc(self.fastaalignment)
-        self.assertEqual(len(consensus), 7)
-        self.assertEqual(consensus[0], 0.5)
-        self.assertEqual(consensus[1], 1.0)
-        self.assertEqual(consensus[2], 0.5)
-        self.assertEqual(consensus[4], 0.1)
+        consensus = internal.Consensus(self.fastaalignment)
+        self.assertEqual(consensus.maxlen, 7)
+        self.assertEqual(consensus.consensus_pc[0], 0.5)
+        self.assertEqual(consensus.consensus_pc[1], 1.0)
+        self.assertEqual(consensus.consensus_pc[2], 0.5)
+        self.assertEqual(consensus.consensus_pc[4], 0.1)
+        self.assertTrue('A' in consensus.consensus[0])
+        self.assertFalse('H' in consensus.consensus[0])
+        self.assertFalse('I' in consensus.consensus[0])
+        self.assertTrue('C' in consensus.consensus[2])
+        self.assertTrue('D' in consensus.consensus[2])
+        self.assertEqual(len(consensus.consensus[2]),2)
+        self.assertEqual(len(consensus.consensus[0]),1)
 
 class TestFixLeakyPipes(unittest.TestCase):
     def test_namewithpipe_fixed(self):
