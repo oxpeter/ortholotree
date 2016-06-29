@@ -15,6 +15,57 @@ import matplotlib as mpl
 import numpy as np
 
 
+####### Classes ################################
+
+class Consensus():
+    def __init__(self, fastafile):
+        self.fastafile = fastafile
+
+        # collect all sequences and find longest:
+        self.all_seqs = {}
+        maxlen = 0
+        for defline, seq, species in get_gene_fastas(fastafile=self.fastafile):
+            self.all_seqs[defline] = seq
+            if len(seq) > maxlen:
+                maxlen = len(seq)
+
+        self.maxlen = maxlen
+
+    def consensus_pc(self):
+        # iterate through each position and get percentage of highest represented marker
+        self.consensus = {}
+        self.consensus_pc = {}
+        print "Max alignment sequence length = %d" % (self.maxlen)
+        for i in range(self.maxlen):
+            counts = {'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'G':0,
+                        'H':0, 'I':0, 'J':0, 'K':0, 'L':0, 'M':0, 'N':0,
+                        'O':0, 'P':0, 'Q':0, 'R':0, 'S':0, 'T':0, 'U':0,
+                        'V':0, 'W':0, 'X':0, 'Y':0, 'Z':0, '-':0, 'null':0,
+                        }
+            for d in self.all_seqs:
+                try:
+                    counts[self.all_seqs[d][i].upper()] += 1
+                except KeyError:
+                    counts['null'] += 1
+                except IndexError:
+                    counts['null'] += 1
+
+            gaps = counts['-']
+            del counts['-']
+            nulls = counts['null']
+            del counts['null']
+            max_aa_count = max(counts.values())
+            self.consensus[i]    = [ aa for aa in counts if counts[aa] == max_aa_count ]
+            self.consensus_pc[i] = (1.0 * max_aa_count / (sum(counts.values())))
+
+
+    def make_sliding_consensus(self, window=20, window_pc=False):
+        if window_pc:
+            window = len(self.consensus_pc.values()) * window / 100
+        self.sliding_cons = {}
+        for i in range(len(self.consensus_pc.values())):
+            self.sliding_cons[i] = (np.mean(self.consensus_pc.values()[i:i+window]))
+
 
 ####### File conversion ########################
 def phylipise(species, number, size=8):
@@ -277,46 +328,7 @@ def get_pcmatch(seq):
     pcmatch = 10.0 * matches / width
     return width, pcmatch
 
-def consensus_pc(fastafile):
-    # collect all sequences and find longest:
-    all_seqs = {}
-    maxlen = 0
-    for defline, seq, species in get_gene_fastas(fastafile=fastafile):
-        all_seqs[defline] = seq
-        if len(seq) > maxlen:
-            maxlen = len(seq)
 
-    # iterate through each position and get percentage of highest represented marker
-    consensus = {}
-    print "Max alignment sequence length = %d" % (maxlen)
-    for i in range(maxlen):
-        counts = {'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'G':0,
-                    'H':0, 'I':0, 'J':0, 'K':0, 'L':0, 'M':0, 'N':0,
-                    'O':0, 'P':0, 'Q':0, 'R':0, 'S':0, 'T':0, 'U':0,
-                    'V':0, 'W':0, 'X':0, 'Y':0, 'Z':0, '-':0, 'null':0,
-                    }
-        for d in all_seqs:
-            try:
-                counts[all_seqs[d][i].upper()] += 1
-            except KeyError:
-                counts['null'] += 1
-            except IndexError:
-                counts['null'] += 1
-
-        gaps = counts['-']
-        del counts['-']
-        nulls = counts['null']
-        del counts['null']
-        consensus[i] = 1.0 * max(counts.values()) / (sum(counts.values()))
-    return consensus
-
-def sliding_average(float_list, window=20, window_pc=False):
-    if window_pc:
-        window = len(float_list) * window / 100
-    sliding_averages = []
-    for i in range(len(float_list)):
-        sliding_averages.append(np.mean(float_list[i:i+window]))
-    return sliding_averages
 
 def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
                         gapthresh=0.05):
