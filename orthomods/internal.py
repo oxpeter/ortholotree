@@ -31,6 +31,9 @@ class Consensus():
 
         self.maxlen = maxlen
 
+        # initiate creation of consensus sequences
+        self.consensus_pc()
+
     def consensus_pc(self):
         # iterate through each position and get percentage of highest represented marker
         self.consensus = {}
@@ -360,10 +363,10 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     hole_points = {}
 
     #get consensus percentages for each position:
-    cons = consensus_pc(fastafile)
+    cons = Consensus(fastafile)
     # calculate sliding average:
-    slave = sliding_average(cons.values())
-    sliding_colors = sm.to_rgba(slave)
+    cons.make_sliding_consensus(20)
+    sliding_colors = sm.to_rgba(cons.sliding_cons.values())
 
     # find gaps:
     for defline, seq, species in get_gene_fastas(fastafile=fastafile):
