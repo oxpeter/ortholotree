@@ -34,11 +34,17 @@ class Consensus():
         # initiate creation of consensus sequences
         self.consensus_pc()
 
+    def __rep__(self):
+        return '%r' % self.fastafile
+
+    def __str__(self):
+        return  "Number of sequences: %d\nMax alignment sequence length = %d" % (len(self.all_seqs), self.maxlen)
+
     def consensus_pc(self, keep_gaps=False):
         # iterate through each position and get percentage of highest represented marker
         self.consensus = {}
         self.consensus_pc = {}
-        print "Max alignment sequence length = %d" % (self.maxlen)
+
         for i in range(self.maxlen):
             counts = {'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'G':0,
                         'H':0, 'I':0, 'J':0, 'K':0, 'L':0, 'M':0, 'N':0,
@@ -72,7 +78,7 @@ class Consensus():
         for i in range(len(self.consensus_pc.values())):
             start = int(i - window / 2.0)
             if start < 0 :
-                start == 0 # negative values will mess up the slicing
+                start = 0 # negative values will mess up the slicing
             end = int(i + window / 2.0)
             self.sliding_cons[i] = np.mean( self.consensus_pc.values()[start:end])
 
@@ -94,7 +100,7 @@ class Consensus():
             for i,bp in enumerate(self.all_seqs[seq]):
                 start = int(i - window / 2.0)
                 if start < 0 :
-                    start == 0  # negative values will mess up the slicing
+                    start = 0  # negative values will mess up the slicing
                 end = int(i + window / 2.0)
 
                 # calculate what percentage of local sites match the consensus
@@ -370,7 +376,6 @@ def get_pcmatch(seq):
     pcmatch = 1.0 * matches / width
     return width, pcmatch
 
-
 def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
                         gapthresh=0.05):
     fig = build_alignment(fastafile, conversiondic, gapthresh=gapthresh)
@@ -400,22 +405,20 @@ def get_graphing_name(defline, conversiondic={}, truncate_name=False):
     return graphingname
 
 def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
-                    truncate_name=False):
+                    truncate_name=False, graph_style='consensus'):
     """
     Draw an alignment graph in the vein of BLAST alignment results on NCBI.
     colour scale represents the percentage of alignment positions filled with actual
     sequence, but does not represent the fit of that alignment. This is indicated by
     adding a consensus bar at the bottom - high consensus meaning most amino acids/base
     pairs are identical in a given sliding window.
-    """
 
-    # setting color maps:
+    graph_style can be 'consensus', 'amino', or 'block'
+    """
+    # set similarity-based color scheme:
     nrml = mpl.colors.Normalize(vmin=0, vmax=1)
     sm = plt.cm.ScalarMappable(cmap=cm.jet, norm=nrml)
     sm._A = []
-
-    graph_points = {}
-    hole_points = {}
 
     #get consensus percentages for each position:
     consensus = Consensus(fastafile)
@@ -425,102 +428,127 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     sliding_colors = sm.to_rgba(consensus.sliding_cons.values())
     consensus.make_local_sliders(20)
 
-    # assign colors to each sequence based on percentage consensus:
-    colorme = { k:[] for k in consensus.all_seqs }
+    # setting color maps:
+    if graph_style == 'amino':
+        # color based on the peptide sequence
+        acma = {'A':[200,200,200,256], 'B':[0,0,0,256],      'C':[230,230,0,256],
+                'D':[230,10,10,256],
+                'E':[230,10,10,256],  'F':[50,50,170,256],  'G':[235,235,235,256],
+                'H':[130,130,210,256],'I':[15,130,15,256],  'J':[0,0,0,256],
+                'K':[20,90,255,256],  'L':[15,130,15,256],  'M':[230,230,0,256],
+                'N':[0,220,220,256],  'O':[0,0,0,256],      'P':[220,150,130,256],
+                'Q':[0,220,220,256],  'R':[20,90,255,256],  'S':[250,150,0,256],
+                'T':[250,150,0,256],  'U':[0,0,0,256],      'V':[15,130,15,256],
+                'W':[180,90,180,256], 'X':[0,0,0,256],      'Y':[50,50,170,256],
+                'Z':[0,0,0,256],      '-':[256,256,256,0],  'null':[256,256,256,0],
+                }
+        acm = {}
+        for aa in acma:
+            acm[aa] = [ n/256.0 for n in acma[aa] ]
+        # assign colors to each sequence based on percentage consensus:
+        colorme = { k:[] for k in consensus.all_seqs }
+        for defline, seq in consensus.all_seqs.items():
+            for aa in seq:
+                colorme[defline].append(acm[aa])
 
-    for defline, seq in consensus.all_seqs.items():
-        for i,pc in enumerate(consensus.sliding_local[defline]):
-            if consensus.all_seqs[defline][i] == '-':
-                colorme[defline].append((1.0,1.0,1.0,0.0))
-            else:
-                colorme[defline].append(sm.to_rgba(pc))
+    elif graph_style == 'consensus':
+        # assign colors to each sequence based on percentage consensus:
+        colorme = { k:[] for k in consensus.all_seqs }
+
+        for defline, seq in consensus.all_seqs.items():
+            for i,pc in enumerate(consensus.sliding_local[defline]):
+                if consensus.all_seqs[defline][i] == '-':
+                    colorme[defline].append((1.0,1.0,1.0,0.0))
+                else:
+                    colorme[defline].append(sm.to_rgba(pc))
+
+    if graph_style in ['consensus', 'amino']:
+        # get coords for alignment (also sort sequences alphabetically):
+        graphingnames = {
+                defline:get_graphing_name(
+                                    defline,
+                                    conversiondic,
+                                    True
+                                        ) for defline in consensus.all_seqs }
+        keynames = sorted([ (graphingnames[d],d) for d in colorme ],
+                            reverse=True,
+                            key=lambda x: x[0])
+        name_pos = np.arange(len(colorme)) + 0.5
+        y_frame = { k:y for k,y in zip(keynames, name_pos)}
+
+        # set all plotting values into lists for loading into plt.barh:
+        y_pos, lefts, widths, colors, bh_lefts, bh_widths = [], [], [], [], [], []
+        for ((gname, defline), namepos) in y_frame.items():
+            y_pos += [namepos] * len(consensus.all_seqs[defline])
+            lefts += range(len(consensus.all_seqs[defline]))
+            widths += [1] * len(consensus.all_seqs[defline])
+            colors += colorme[defline]
 
 
+    elif graph_style == 'block':
+        # the original gap-based color scheme:
+        # find gaps:
+        graph_points = {}
+        for defline, seq in consensus.all_seqs.items():
+            # determine the smallest reportable gap size is:
+            repgap = int(gapthresh * len(seq))
 
-    # get coords for alignment (also sort sequences alphabetically):
-    graphingnames = {
-            defline:get_graphing_name(
-                                defline,
-                                conversiondic,
-                                True
-                                    ) for defline in consensus.all_seqs }
-    keynames = sorted([ (graphingnames[d],d) for d in colorme ],
-                        reverse=True,
-                        key=lambda x: x[0])
-    name_pos = np.arange(len(colorme)) + 0.5
-    y_frame = { k:y for k,y in zip(keynames, name_pos)}
+            # get distances and coverage percentages
+            points = re.search('^(-*)(\S+[A-Za-z])(-*)$', seq)
+            if points:
+                pattern = '-{' + str(repgap) + ',}'
+                fragments = re.findall(pattern, points.group(2))
+                # set starting pos to beginning of matching sequence:
+                spos = len(points.group(1))
+                if len(fragments) > 0:
+                    """
+                    dists is a list of tuples, each tuple containing the start position of
+                    a large gap,  the length of the gap, the start of the preceding non-gap
+                    fragment, its width and the % match.
+                    """
+                    dists = []
+                    for frag in fragments:
+                        nextgap = seq.find(frag, spos)
+                        width, pcmatch = get_pcmatch(seq[spos:nextgap])
+                        dists.append((nextgap,len(frag), spos, width, pcmatch))
+                        spos = nextgap + len(frag)
 
-    # set all plotting values:
-    y_pos, lefts, widths, colors, bh_lefts, bh_widths = [], [], [], [], [], []
-    for ((gname, defline), namepos) in y_frame.items():
-        y_pos += [namepos] * len(consensus.all_seqs[defline])
-        lefts += range(len(consensus.all_seqs[defline]))
-        widths += [1] * len(consensus.all_seqs[defline])
-        colors += colorme[defline]
-
-
-    """
-    #### HOPEFULLY DEPRECATED! #####
-    # find gaps:
-    for defline, seq in consensus.all_seqs.items():
-        # determine the smallest reportable gap size is:
-        repgap = int(gapthresh * len(seq))
-
-        # get distances and coverage percentages
-        points = re.search('^(-*)(\S+[A-Za-z])(-*)$', seq)
-        if points:
-            pattern = '-{' + str(repgap) + ',}'
-            fragments = re.findall(pattern, points.group(2))
-            # set starting pos to beginning of matching sequence:
-            spos = len(points.group(1))
-            if len(fragments) > 0:
-                " ""
-                dists is a list of tuples, each tuple containing the start position of
-                a large gap,  the length of the gap, the start of the preceding non-gap
-                fragment, its width and the % match.
-                " ""
-                dists = []
-                for frag in fragments:
-                    nextgap = seq.find(frag, spos)
-                    width, pcmatch = get_pcmatch(seq[spos:nextgap])
-                    dists.append((nextgap,len(frag), spos, width, pcmatch))
-                    spos = nextgap + len(frag)
+                    else:
+                        lastfrag = points.group(3)
+                        nextgap = len(seq) - len(lastfrag)
+                        width, pcmatch = get_pcmatch(seq[spos:nextgap])
+                        dists.append((0,0, spos, width, pcmatch))
 
                 else:
-                    lastfrag = points.group(3)
-                    nextgap = len(seq) - len(lastfrag)
-                    width, pcmatch = get_pcmatch(seq[spos:nextgap])
-                    dists.append((0,0, spos, width, pcmatch))
+                    width, pcmatch = get_pcmatch(points.group(2))
+                    dists = [(0,0,spos, width, pcmatch)]
 
             else:
-                width, pcmatch = get_pcmatch(points.group(2))
-                dists = [(0,0,spos, width, pcmatch)]
-
-        else:
-            dists = [(0,0,0,1,0)]
+                dists = [(0,0,0,1,0)]
 
 
-        # get name (convert if possible):
-        graphingname = get_graph_name(defline, conversiondic)
-        graph_points[graphingname] = dists
+            # get name (convert if possible):
+            graphingname = get_graphing_name(defline, conversiondic, True)
+            graph_points[graphingname] = dists
 
-    # get coords for alignment:
-    keynames = sorted(graph_points.keys(), reverse=True)
-    name_pos = np.arange(len(graph_points)) + 0.5
-    y_frame = { k:y for k,y in zip(keynames, name_pos)}
+        # get coords for alignment:
+        keynames = sorted(graph_points.keys(), reverse=True)
+        name_pos = np.arange(len(graph_points)) + 0.5
+        y_frame = { k:y for k,y in zip(keynames, name_pos)}
 
-    y_pos, lefts, widths, colors, bh_lefts, bh_widths = [], [], [], [], [], []
-    for k in keynames:
-        for dists in graph_points[k]:
-            y_pos.append(y_frame[k])
-            lefts.append(dists[2])
-            widths.append(dists[3])
-            colors.append(sm.to_rgba(dists[4]))
-            bh_lefts.append(dists[0])
-            bh_widths.append(dists[1])
-    """
+        y_pos, lefts, widths, colors, bh_lefts, bh_widths = [], [], [], [], [], []
+        for k in keynames:
+            for dists in graph_points[k]:
+                y_pos.append(y_frame[k])
+                lefts.append(dists[2])
+                widths.append(dists[3])
+                colors.append(sm.to_rgba(dists[4]))
+                #bh_lefts.append(dists[0])
+                #bh_widths.append(dists[1])
+        keynames = [ (n,n) for n in keynames ] # to make compatible with amino and consensus
 
     # plot graph:
+    """
     if 30 > len(keynames) :
         fig = plt.figure(figsize=(img_width,img_width*1))
     elif 60 > len(keynames) >= 30:
@@ -528,7 +556,8 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     elif 90 > len(keynames) >= 60:
         fig = plt.figure(figsize=(img_width,img_width*3))
     else:
-        fig = plt.figure(figsize=(img_width,int(len(keynames)/2.8)))
+    """
+    fig = plt.figure(figsize=(img_width,int(len(keynames)/3) + 2))
 
     # plot alignments:
     ax1 = plt.subplot2grid((12,10),(0,0), colspan=9, rowspan=9)
@@ -539,11 +568,12 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                 color=colors,
                 edgecolor=colors)
 
-    #plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
-    #        alpha=0.5)
+    #if graph_style == 'block':
+    #    plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
+    #            alpha=0.5)
     plt.yticks(name_pos + 0.4, [k[0] for k in keynames])
     plt.xlabel("position (aa)")
-    plt.title("MAFFT peptide alignment")
+    plt.title("Peptide alignment and amino acid sequence")
     plt.tight_layout()
 
     # plot legend:
