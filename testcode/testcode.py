@@ -140,15 +140,15 @@ class TestFixLeakyPipes(unittest.TestCase):
 class TestPCmatch(unittest.TestCase):
     def test_pcmatch100(self):
         self.assertEqual(internal.get_pcmatch('ABCDEFGHIJ'),
-                            (10,10))
+                            (10,1))
     def test_pcmatch0(self):
         self.assertEqual(internal.get_pcmatch('----------'),
                             (10,0))
     def test_pcmatch50(self):
         self.assertEqual(internal.get_pcmatch('ABCDE-----'),
-                            (10,5))
+                            (10,0.5))
         self.assertEqual(internal.get_pcmatch('A-B-C-D-E-'),
-                            (10,5))
+                            (10,0.5))
 
 
 
