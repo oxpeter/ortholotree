@@ -34,7 +34,7 @@ class Consensus():
         # initiate creation of consensus sequences
         self.consensus_pc()
 
-    def consensus_pc(self):
+    def consensus_pc(self, keep_gaps=False):
         # iterate through each position and get percentage of highest represented marker
         self.consensus = {}
         self.consensus_pc = {}
@@ -53,21 +53,60 @@ class Consensus():
                 except IndexError:
                     counts['null'] += 1
 
-            gaps = counts['-']
-            del counts['-']
+            if not keep_gaps:
+                gaps = counts['-']
+                del counts['-']
             nulls = counts['null']
             del counts['null']
             max_aa_count = max(counts.values())
             self.consensus[i]    = [ aa for aa in counts if counts[aa] == max_aa_count ]
             self.consensus_pc[i] = (1.0 * max_aa_count / (sum(counts.values())))
 
-
     def make_sliding_consensus(self, window=20, window_pc=False):
+        """
+        Creates the global average consensus across a specified sliding window distance
+        """
         if window_pc:
-            window = len(self.consensus_pc.values()) * window / 100
+            window = len(self.consensus_pc.values()) * window / 100.0
         self.sliding_cons = {}
         for i in range(len(self.consensus_pc.values())):
-            self.sliding_cons[i] = (np.mean(self.consensus_pc.values()[i:i+window]))
+            start = int(i - window / 2.0)
+            if start < 0 :
+                start == 0 # negative values will mess up the slicing
+            end = int(i + window / 2.0)
+            self.sliding_cons[i] = np.mean( self.consensus_pc.values()[start:end])
+
+    def make_local_sliders(self, window=20, window_pc=False):
+        """
+        Creates the average level of consensus for each sequence across the specified
+        window size.
+
+        NB: if keep_gaps is false for the consensus, then a sequence with a perfect
+        consensus match, but a few gaps, will have lower scores in those positions
+        flanking the gaps, as a gap will not be considered a consensus sequence, and
+        therefore score 0 when calculating the percentage.
+        """
+        if window_pc:
+            window = len(self.consensus_pc.values()) * window / 100.0
+
+        self.sliding_local = { seq:[] for seq in self.all_seqs }
+        for seq in self.all_seqs:
+            for i,bp in enumerate(self.all_seqs[seq]):
+                start = int(i - window / 2.0)
+                if start < 0 :
+                    start == 0  # negative values will mess up the slicing
+                end = int(i + window / 2.0)
+
+                # calculate what percentage of local sites match the consensus
+                # (note the consideration for multiple sequences --> "l in c"
+                idx_pc = sum( 1 for l,c in zip(
+                                        self.all_seqs[seq][start:end],
+                                        self.consensus.values()[start:end],
+                                            ) if l in c
+                            ) / float(end - start)
+
+                self.sliding_local[seq].append(idx_pc)
+
 
 
 ####### File conversion ########################
@@ -328,9 +367,8 @@ def get_pcmatch(seq):
     width = len(seq)
     matches = width - minigaps
     assert matches >= 0
-    pcmatch = 10.0 * matches / width
+    pcmatch = 1.0 * matches / width
     return width, pcmatch
-
 
 
 def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
@@ -343,6 +381,24 @@ def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
     else:
         plt.close()
 
+def get_graphing_name(defline, conversiondic={}, truncate_name=False):
+    namesearch = re.search('^>*(\S+)', defline)
+    if namesearch:
+        genename = namesearch.group(1)
+    else:
+        genename = defline.strip()
+    if genename in conversiondic:
+        fullname = conversiondic[genename][0]
+    else:
+        fullname = genename
+
+    if truncate_name and len(fullname) > 11:
+        graphingname = "...".join([genename[:6],genename[-5:]])
+    else:
+        graphingname = fullname
+
+    return graphingname
+
 def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                     truncate_name=False):
     """
@@ -352,9 +408,8 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     adding a consensus bar at the bottom - high consensus meaning most amino acids/base
     pairs are identical in a given sliding window.
     """
-    #cmap = {0:'white', 1:'silver', 2:'tan' ,3:'cornflowerblue' ,4:'blue' ,5:'darkcyan' ,6:'green', 7:'gold' ,8:'orangered' ,9:'red' ,10:'maroon'}
-    #cmap = cm.cool
-    print "setting color maps"
+
+    # setting color maps:
     nrml = mpl.colors.Normalize(vmin=0, vmax=1)
     sm = plt.cm.ScalarMappable(cmap=cm.jet, norm=nrml)
     sm._A = []
@@ -363,13 +418,50 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     hole_points = {}
 
     #get consensus percentages for each position:
-    cons = Consensus(fastafile)
-    # calculate sliding average:
-    cons.make_sliding_consensus(20)
-    sliding_colors = sm.to_rgba(cons.sliding_cons.values())
+    consensus = Consensus(fastafile)
 
+    # calculate sliding average:
+    consensus.make_sliding_consensus(20)
+    sliding_colors = sm.to_rgba(consensus.sliding_cons.values())
+    consensus.make_local_sliders(20)
+
+    # assign colors to each sequence based on percentage consensus:
+    colorme = { k:[] for k in consensus.all_seqs }
+
+    for defline, seq in consensus.all_seqs.items():
+        for i,pc in enumerate(consensus.sliding_local[defline]):
+            if consensus.all_seqs[defline][i] == '-':
+                colorme[defline].append((1.0,1.0,1.0,0.0))
+            else:
+                colorme[defline].append(sm.to_rgba(pc))
+
+
+
+    # get coords for alignment (also sort sequences alphabetically):
+    graphingnames = {
+            defline:get_graphing_name(
+                                defline,
+                                conversiondic
+                                    ) for defline in consensus.all_seqs }
+    keynames = sorted([ (graphingnames[d],d) for d in colorme ],
+                        reverse=True,
+                        key=lambda x: x[0])
+    name_pos = np.arange(len(colorme)) + 0.5
+    y_frame = { k:y for k,y in zip(keynames, name_pos)}
+
+    # set all plotting values:
+    y_pos, lefts, widths, colors, bh_lefts, bh_widths = [], [], [], [], [], []
+    for ((gname, defline), namepos) in y_frame.items():
+        y_pos += [namepos] * len(consensus.all_seqs[defline])
+        lefts += range(len(consensus.all_seqs[defline]))
+        widths += [1] * len(consensus.all_seqs[defline])
+        colors += colorme[defline]
+
+
+    """
+    #### HOPEFULLY DEPRECATED! #####
     # find gaps:
-    for defline, seq, species in get_gene_fastas(fastafile=fastafile):
+    for defline, seq in consensus.all_seqs.items():
         # determine the smallest reportable gap size is:
         repgap = int(gapthresh * len(seq))
 
@@ -381,11 +473,11 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
             # set starting pos to beginning of matching sequence:
             spos = len(points.group(1))
             if len(fragments) > 0:
-                """
+                " ""
                 dists is a list of tuples, each tuple containing the start position of
                 a large gap,  the length of the gap, the start of the preceding non-gap
                 fragment, its width and the % match.
-                """
+                " ""
                 dists = []
                 for frag in fragments:
                     nextgap = seq.find(frag, spos)
@@ -406,22 +498,9 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
         else:
             dists = [(0,0,0,1,0)]
 
+
         # get name (convert if possible):
-        namesearch = re.search('>+(\S+)', defline)
-        if namesearch:
-            genename = namesearch.group(1)
-        else:
-            genename = defline.strip()
-        if genename in conversiondic:
-            fullname = conversiondic[genename][0]
-        else:
-            fullname = genename
-
-        if truncate_name and len(fullname) > 11:
-            graphingname = "...".join([genename[:6],genename[-5:]])
-        else:
-            graphingname = fullname
-
+        graphingname = get_graph_name(defline, conversiondic)
         graph_points[graphingname] = dists
 
     # get coords for alignment:
@@ -435,9 +514,10 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
             y_pos.append(y_frame[k])
             lefts.append(dists[2])
             widths.append(dists[3])
-            colors.append(sm.to_rgba(dists[4]/10.0))
+            colors.append(sm.to_rgba(dists[4]))
             bh_lefts.append(dists[0])
             bh_widths.append(dists[1])
+    """
 
     # plot graph:
     if 30 > len(keynames) :
@@ -451,12 +531,18 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
 
     # plot alignments:
     ax1 = plt.subplot2grid((12,10),(0,0), colspan=9, rowspan=9)
-    plt.barh(left=lefts,    width=widths,    bottom=y_pos, height=0.8, color=colors)
-    plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
-            alpha=0.5)
-    plt.yticks(name_pos + 0.4, keynames)
+    plt.barh(left=lefts,
+                width=widths,
+                bottom=y_pos,
+                height=0.8,
+                color=colors,
+                edgecolor=colors)
+
+    #plt.barh(left=bh_lefts, width=bh_widths, bottom=y_pos, height=0.8, color='white',
+    #        alpha=0.5)
+    plt.yticks(name_pos + 0.4, [k[0] for k in keynames])
     plt.xlabel("position (aa)")
-    plt.title("Gaps in alignment (%)")
+    plt.title("MAFFT peptide alignment")
     plt.tight_layout()
 
     # plot legend:
@@ -466,13 +552,13 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
 
     # plot consensus colors:
     ax3 = plt.subplot2grid((12,10),(9,0), colspan=9,rowspan=2)
-    size = len(slave)
+    size = consensus.maxlen
     plt.barh(left=range(size), bottom=[1]*size,
                 height=[0.8]*size, width=[1]*size,
                 color=sliding_colors,
                 edgecolor=sliding_colors,)
     plt.tick_params(axis='y', which='both', left='off', right='off', labelleft='off')
-    plt.xlabel("25 aa sliding average consensus (%)")
+    plt.xlabel("20 aa sliding global average consensus (%)")
     plt.tight_layout()
     return fig
 
