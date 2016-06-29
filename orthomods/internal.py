@@ -441,7 +441,8 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     graphingnames = {
             defline:get_graphing_name(
                                 defline,
-                                conversiondic
+                                conversiondic,
+                                True
                                     ) for defline in consensus.all_seqs }
     keynames = sorted([ (graphingnames[d],d) for d in colorme ],
                         reverse=True,
