@@ -181,5 +181,21 @@ class TestHmmerParsing(HMMerTestCase):
         self.assertEqual(hmmer.domain_seq['sp|Q9VC44|ALLS_DROME'][1],dmel_dom1)
         self.assertEqual(hmmer.domain_seq['sp|Q9VC44|ALLS_DROME'][2],dmel_dom2)
 
+        dmel_prob1 = "4454443.3.3569***********99998.444"
+        dmel_prob2 = "78999******985678886433478889******99678********98.59999999**9624444.3445555566667776532389******97"
+        self.assertEqual(hmmer.domain_prb['sp|Q9VC44|ALLS_DROME'][1],dmel_prob1)
+        self.assertEqual(hmmer.domain_prb['sp|Q9VC44|ALLS_DROME'][2],dmel_prob2)
+
+        dmel_desc = "Allatostatin-A OS=Drosophila melanogas"
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['eval'], 1.5e-07)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['score'], 36.7)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['bias'], 7.3)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['dom_e'], 1.5e-06)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['dom_s'], 33.4)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['dom_b'], 6.6)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['dom_exp'], 2.2)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['dom_no'], 2)
+        self.assertEqual(hmmer.stats['sp|Q9VC44|ALLS_DROME']['desc'], dmel_desc)
+
 if __name__ == '__main__':
     unittest.main()
