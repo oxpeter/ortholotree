@@ -538,8 +538,9 @@ def get_pcmatch(seq):
     return width, pcmatch
 
 def display_alignment(fastafile, conversiondic={}, outfile=None, showplot=True,
-                        gapthresh=0.05):
-    fig = build_alignment(fastafile, conversiondic, gapthresh=gapthresh)
+                        gapthresh=0.05, domain_prb=None, domain_stats=None):
+    fig = build_alignment(fastafile, conversiondic, gapthresh=gapthresh,
+                          domain_prb=domain_prb, domain_stats=domain_stats)
     if outfile:
         fig.savefig(outfile, format='png')
     if showplot:
@@ -566,15 +567,22 @@ def get_graphing_name(defline, conversiondic={}, truncate_name=False):
     return graphingname
 
 def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
-                    truncate_name=False, graph_style='consensus'):
+                    truncate_name=False, graph_style='consensus',
+                    domain_prb=None, domain_stats=None):
     """
+    Draws an alignment graph with coloring providing one of several different schemes.
+    graph_style can be 'consensus', 'amino', 'domains', or 'block' ('pfam' coming soon!)
+
+    'block':
     Draw an alignment graph in the vein of BLAST alignment results on NCBI.
     colour scale represents the percentage of alignment positions filled with actual
     sequence, but does not represent the fit of that alignment. This is indicated by
     adding a consensus bar at the bottom - high consensus meaning most amino acids/base
     pairs are identical in a given sliding window.
 
-    graph_style can be 'consensus', 'amino', or 'block'
+    'domains':
+    Colored regions indicate the HMM alignment domains, with the color related to the
+    probability score at that position.
     """
     # set similarity-based color scheme:
     nrml = mpl.colors.Normalize(vmin=0, vmax=1)
@@ -606,7 +614,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
         acm = {}
         for aa in acma:
             acm[aa] = [ n/256.0 for n in acma[aa] ]
-        # assign colors to each sequence based on percentage consensus:
+        # assign colors to each sequence based on amino acid sequence:
         colorme = { k:[] for k in consensus.all_seqs }
         for defline, seq in consensus.all_seqs.items():
             for aa in seq:
@@ -622,6 +630,13 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                     colorme[defline].append((1.0,1.0,1.0,0.0))
                 else:
                     colorme[defline].append(sm.to_rgba(pc))
+
+    elif graph_style == 'domains':
+        # assign colors to each sequence based on domain match probability:
+        colorme = { k:[] for k in consensus.all_seqs }
+        for defline, seq in consensus.all_seqs.items():
+            pass
+
 
     if graph_style in ['consensus', 'amino']:
         # get coords for alignment (also sort sequences alphabetically):

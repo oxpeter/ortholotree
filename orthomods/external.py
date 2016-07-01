@@ -193,7 +193,11 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
 
         # filter local file based on parameters given:
         hmmrs = all_results[sp]
-        filtered_results[sp] = { gene:(sp, hmmrs.stats[gene]['score'], hmmrs.stats[gene]['eval']) for i,gene in enumerate(hmmrs.stats) if hmmrs.stats[gene]['score'] >= cutoff_thresh or i < mincollect}
+        filtered_results[sp] = { gene:(sp,
+                                        hmmrs.stats[gene]['score'],
+                                        hmmrs.stats[gene]['eval'],
+                                        hmmrs,
+                                       ) for i,gene in enumerate(hmmrs.stats) if hmmrs.stats[gene]['score'] >= cutoff_thresh or i < mincollect}
 
     # filter for global threshold (ie, based on % of best match). Most useful if no
     # species has been specified for fasta file.
