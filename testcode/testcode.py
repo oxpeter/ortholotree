@@ -150,7 +150,36 @@ class TestPCmatch(unittest.TestCase):
         self.assertEqual(internal.get_pcmatch('A-B-C-D-E-'),
                             (10,0.5))
 
+class HMMerTestCase(unittest.TestCase):
+    def setUp(self):
+        self.hmmerfile = resource_filename('testcode', 'phmmer_out.txt')
 
+class TestHmmerParsing(HMMerTestCase):
+    def test_make_instance(self):
+        with open(self.hmmerfile) as handle:
+            hmmer = internal.HMMer(handle)
+        self.assertTrue(hmmer)
+
+    def test_hmmer_stats(self):
+        with open(self.hmmerfile) as handle:
+            hmmer = internal.HMMer(handle)
+
+        self.assertEqual(hmmer.query, 'Amel|AST')
+        self.assertEqual(len(hmmer.targets), 6)
+        self.assertEqual(hmmer.targets[0], 'sp|P85797|ALLS_APIME')
+        self.assertEqual(len(hmmer.domain_seq), 10)
+        self.assertEqual(len(hmmer.domain_prb), 10)
+        self.assertEqual(len(hmmer.domain_stats), 10)
+        self.assertEqual(len(hmmer.stats), 6)
+
+    def test_hmmer_sequences(self):
+        with open(self.hmmerfile) as handle:
+            hmmer = internal.HMMer(handle)
+
+        dmel_dom1 = "GGDNIDK-R-VERYAFGLGRRAYMYTNGGP-GMK"
+        dmel_dom2 = "KRVERYAFGLGRRaYMYTNGGpgmKRLPVYNFGLGKRsRPYSFGLGKRSD-YDYDQDNEIDYRvPPAN-YLAAERAVRPGRQNKRTTrpQPFNFGLGRR"
+        self.assertEqual(hmmer.domain_seq['sp|Q9VC44|ALLS_DROME'][1],dmel_dom1)
+        self.assertEqual(hmmer.domain_seq['sp|Q9VC44|ALLS_DROME'][2],dmel_dom2)
 
 if __name__ == '__main__':
     unittest.main()
