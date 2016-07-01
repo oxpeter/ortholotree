@@ -631,13 +631,24 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                 else:
                     colorme[defline].append(sm.to_rgba(pc))
 
-    elif graph_style == 'domains':
+    elif graph_style == 'domain':
         # assign colors to each sequence based on domain match probability:
         colorme = { k:[] for k in consensus.all_seqs }
+
+        # more error catching to do:
+        #if colorme.keys()[0] not in domain_prb:
+        #    colorme = { k[1:]:[] for k in consensus.all_seqs }
+
         for defline, seq in consensus.all_seqs.items():
             # create consensus probabilities:
-            # create lists of probabilites that span the whole sequence:
             probstring = {}
+
+            # catch error from the unknown passing of different gene names (to be tracked)
+            if defline not in domain_stats:
+                domain_stats = { '>'+k:v for k,v in domain_stats.items() }
+                domain_prb = { '>'+k:v for k,v in domain_prb.items() }
+
+            # create lists of probabilites that span the whole sequence:
             for dom,dom_stats in domain_stats[defline].items():
                 domstart = dom_stats['alifrom']
                 dom_end  = dom_stats['alito']
@@ -653,11 +664,11 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                 if aa == '-':
                     colorme[defline].append((1.0,1.0,1.0,0.0))
                 else:
-                    colorme[defline].append(sm.to_rbga(maxprobs.pop(0)))
+                    colorme[defline].append(sm.to_rgba(maxprobs.pop(0)))
 
 
 
-    if graph_style in ['consensus', 'amino']:
+    if graph_style in ['consensus', 'amino', 'domain']:
         # get coords for alignment (also sort sequences alphabetically):
         graphingnames = {
                 defline:get_graphing_name(
@@ -857,7 +868,7 @@ def probstr_to_floats(s):
     numlist = []
     for x in s:
         if is_number(x):
-            numlist.append(float(s)/10)
+            numlist.append(float(x)/10)
         elif x == '*':
             numlist.append(1)
         elif x == '.':
