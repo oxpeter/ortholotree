@@ -113,6 +113,126 @@ class Consensus():
 
                 self.sliding_local[seq].append(idx_pc)
 
+class HMMer():
+    def __init__(self, hmmer_handle):
+        self.query = None
+        self.stats = {}
+        self.targets = []
+
+        self.domain_seq = {}   # the sequence of each domain
+        self.domain_aln = {}   # the alignment summary for each domain
+        self.domain_prb = {}   # the probability score for each domain
+        self.domain_stats = {} # the result scores for each domain (indexed by target then dom)
+
+        # initialise variables:
+        current_target = None
+
+        for line in hmmer_handle:
+            if len(line) == 0 or line[0] == '#':
+                continue
+            else:
+                cols = line.split()
+                if len(cols) == 0:
+                    continue
+
+
+            if cols[0:5] == ['Domain', 'annotation', 'for', 'each', 'sequence']:
+                in_complete = False
+                in_annotation = True
+            elif cols[1:3] == ['inclusion', 'threshold']:
+                in_complete = False
+                in_annotation = False
+            elif not self.query and cols[0] == 'Query:':
+                self.query = cols[1]
+                in_complete = True
+                in_annotation = False
+
+            if in_complete:
+                if is_number(cols[0]):
+                    # load the search scores into the stats dic
+                    self.stats[cols[8]] = { 'eval'   :float(cols[0]),
+                                            'score'  :float(cols[1]),
+                                            'bias'   :float(cols[2]),
+                                            'dom_e'  :float(cols[3]),
+                                            'dom_s'  :float(cols[4]),
+                                            'dom_b'  :float(cols[5]),
+                                            'dom_exp':float(cols[6]),
+                                            'dom_no' :int(cols[7]),
+                                            'desc'   :" ".join(cols[9:])}
+                    self.targets.append(cols[8])
+                else:
+                    continue
+
+            elif in_annotation:
+                if cols[0] == '>>': # ie, new target reached
+                    # update stats for last domain
+                    if current_target and domain_counter > 0:
+                        self.domain_seq[current_target][domain_counter] = tseq
+                        self.domain_prb[current_target][domain_counter] = prob
+
+                    # initialise variables and libraries
+                    current_target = cols[1]
+                    domain_counter = 0
+                    self.domain_stats[current_target] = {}
+                    self.domain_seq[current_target] = {}
+                    self.domain_prb[current_target] = {}
+
+                elif cols[0] == '==':
+                    # update stats for last domain
+                    if current_target and domain_counter > 0:
+                        self.domain_seq[current_target][domain_counter] = tseq
+                        self.domain_prb[current_target][domain_counter] = prob
+
+                    # update counter
+                    domain_counter += 1
+
+                    # reset variables
+                    tseq = ""
+                    algn = ""
+                    prob = ""
+
+                elif cols[:4] == ['Internal', 'pipeline', 'statistics', 'summary:']:
+                    # end of file wrap up #
+                    # update stats for last domain
+                    if current_target and domain_counter > 0:
+                        self.domain_seq[current_target][domain_counter] = tseq
+                        self.domain_prb[current_target][domain_counter] = prob
+                    break
+
+                elif is_number(cols[0]) and domain_counter == 0: # parse domain result table
+                    self.domain_stats[current_target][int(cols[0])] = {'score':float(cols[2]),
+                                                        'bias'      :float(cols[3]),
+                                                        'c-eval'    :float(cols[4]),
+                                                        'i-eval'    :float(cols[5]),
+                                                        'hmmfrom'   :int(cols[6]),
+                                                        'hmmto'     :int(cols[7]),
+                                                        'alifrom'   :int(cols[9]),
+                                                        'alito'     :int(cols[10]),
+                                                        'envfrom'   :int(cols[12]),
+                                                        'envto'     :int(cols[13]),
+                                                        'acc'       :float(cols[15])}
+                else:
+                    if cols[0] == self.query: # query sequence
+                        continue
+                    elif cols[0] == current_target:
+                        tseq += cols[2]
+                    elif cols[-1] == 'PP': # probability scores
+                        prob += cols[0]
+                    ## TODO: Figure out how to efficiently parse the alignment string
+                    else:
+                        continue
+
+        hmmer_handle.close()
+
+    def __rep__(self):
+        return "%r" % self.query
+
+    def __str__(self):
+        return "%s:\n%s targets" % (self.query, len(self.targets))
+
+
+
+
 
 
 ####### File conversion ########################
@@ -648,6 +768,13 @@ def rename_newick(raxml_final, conversiondic={}):
     return newfile
 
 ################################################
+def is_number(s):
+    try:
+        float(s)
+    except ValueError:
+        return False
+    else:
+        return True
 
 def main():
     pass
