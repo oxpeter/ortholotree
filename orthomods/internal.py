@@ -635,7 +635,26 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
         # assign colors to each sequence based on domain match probability:
         colorme = { k:[] for k in consensus.all_seqs }
         for defline, seq in consensus.all_seqs.items():
-            pass
+            # create consensus probabilities:
+            # create lists of probabilites that span the whole sequence:
+            probstring = {}
+            for dom,dom_stats in domain_stats[defline].items():
+                domstart = dom_stats['alifrom']
+                dom_end  = dom_stats['alito']
+                probs    = probstr_to_floats(domain_prb[defline][dom])
+                probstring[dom] = [0] * (domstart - 1) + probs + \
+                                  [0] * (len(seq.replace("-","")) - dom_end)
+
+            # merge the probabilities (by keeping the best match in all positions)
+            maxprobs = [ max(t) for t in zip(*probstring.values()) ]
+
+            # assign the color for each position in the aligned sequence:
+            for i, aa in enumerate(seq):
+                if aa == '-':
+                    colorme[defline].append((1.0,1.0,1.0,0.0))
+                else:
+                    colorme[defline].append(sm.to_rbga(maxprobs.pop(0)))
+
 
 
     if graph_style in ['consensus', 'amino']:
@@ -832,6 +851,21 @@ def is_number(s):
         return False
     else:
         return True
+
+def probstr_to_floats(s):
+    "converts a HMMer result file probability string to a list of probabilites between 0 and 1"
+    numlist = []
+    for x in s:
+        if is_number(x):
+            numlist.append(float(s)/10)
+        elif x == '*':
+            numlist.append(1)
+        elif x == '.':
+            pass
+        else:
+            raise TypeError('unsupported character: %r' % x)
+
+    return numlist
 
 def main():
     pass
