@@ -568,7 +568,7 @@ def get_graphing_name(defline, conversiondic={}, truncate_name=False):
 
 def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                     truncate_name=False, graph_style='consensus',
-                    domain_prb=None, domain_stats=None):
+                    domain_prb=None, domain_stats=None, window=20):
     """
     Draws an alignment graph with coloring providing one of several different schemes.
     graph_style can be 'consensus', 'amino', 'domains', or 'block' ('pfam' coming soon!)
@@ -593,12 +593,13 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     consensus = Consensus(fastafile)
 
     # calculate sliding average:
-    consensus.make_sliding_consensus(20)
+    consensus.make_sliding_consensus(window)
     sliding_colors = sm.to_rgba(consensus.sliding_cons.values())
-    consensus.make_local_sliders(20)
+    consensus.make_local_sliders(window)
 
     # setting color maps:
     if graph_style == 'amino':
+        graph_title = "Peptide alignment showing amino acid sequence"
         # color based on the peptide sequence
         acma = {'A':[200,200,200,256], 'B':[0,0,0,256],      'C':[230,230,0,256],
                 'D':[230,10,10,256],
@@ -621,6 +622,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                 colorme[defline].append(acm[aa])
 
     elif graph_style == 'consensus':
+        graph_title = "Peptide alignment with similarity to consensus"
         # assign colors to each sequence based on percentage consensus:
         colorme = { k:[] for k in consensus.all_seqs }
 
@@ -632,6 +634,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
                     colorme[defline].append(sm.to_rgba(pc))
 
     elif graph_style == 'domain':
+        graph_title = "Peptide alignment with HMMer domain probabilities"
         # assign colors to each sequence based on domain match probability:
         colorme = { k:[] for k in consensus.all_seqs }
 
@@ -659,12 +662,15 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
             # merge the probabilities (by keeping the best match in all positions)
             maxprobs = [ max(t) for t in zip(*probstring.values()) ]
 
+            # create a sliding window average for smoother viewing:
+            slidingprobs = list(np.convolve(maxprobs, np.ones((window,))/window)[(window-1):])
+
             # assign the color for each position in the aligned sequence:
             for i, aa in enumerate(seq):
                 if aa == '-':
                     colorme[defline].append((1.0,1.0,1.0,0.0))
                 else:
-                    colorme[defline].append(sm.to_rgba(maxprobs.pop(0)))
+                    colorme[defline].append(sm.to_rgba(slidingprobs.pop(0)))
 
 
 
@@ -692,6 +698,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
 
 
     elif graph_style == 'block':
+        graph_title = "Peptide alignment with gap densities"
         # the original gap-based color scheme:
         # find gaps:
         graph_points = {}
@@ -763,7 +770,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
         fig = plt.figure(figsize=(img_width,img_width*3))
     else:
     """
-    fig = plt.figure(figsize=(img_width,int(len(keynames)/3) + 2))
+    fig = plt.figure(figsize=(img_width,int(len(keynames)/3) + 3))
 
     # plot alignments:
     ax1 = plt.subplot2grid((12,10),(0,0), colspan=9, rowspan=9)
@@ -779,7 +786,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
     #            alpha=0.5)
     plt.yticks(name_pos + 0.4, [k[0] for k in keynames])
     plt.xlabel("position (aa)")
-    plt.title("Peptide alignment and amino acid sequence")
+    plt.title(graph_title)
     plt.tight_layout()
 
     # plot legend:
