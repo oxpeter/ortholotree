@@ -114,6 +114,47 @@ class Consensus():
                 self.sliding_local[seq].append(idx_pc)
 
 class HMMer():
+    """
+    A class for parsing HMMer results files.
+
+    this class efficiently parses the hmmer result file, making all
+    the different elements available for use.
+
+    INPUT:
+    handle to hmmer result file.
+
+    ATTRIBUTES:
+    query: query name
+    target: list of significant target matches
+    domain_seq: dictionary of domain sequences for each domain for each target
+    domain_prb: domain probability scores for each alignment
+    stats: indexed by target -->
+           {'eval'   : Evalue for target
+            'score'  : HMM score for target
+            'bias'   : target bias
+            'dom_e'  : e-value for best domain
+            'dom_s'  : score for best domain
+            'dom_b'  : bias for best domain
+            'dom_exp': number of expected domains
+            'dom_no' : actual number of domains found
+            'desc'   : description of target (from original defline)
+            }
+    domain_stats: indexed by target then by domain (starting at 1) -->
+           {'score'
+            'bias'
+            'c-eval'
+            'i-eval'
+            'hmmfrom'
+            'hmmto'
+            'alifrom'
+            'alito'
+            'envfrom'
+            'envto'
+            'acc'
+            }
+
+
+    """
     def __init__(self, hmmer_handle):
         self.query = None
         self.stats = {}
@@ -718,6 +759,7 @@ def build_alignment(fastafile, conversiondic={}, img_width=10, gapthresh=0.05,
 
 def parse_the_hmmer(handle):
     """
+    ####### DEPRECATED ######
     parses the protein matches from a hmmer search and returns a dictionary of peptides
     and their associated score and p-value.
     """
