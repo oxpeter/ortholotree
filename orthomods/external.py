@@ -175,16 +175,16 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
                 continue
 
         # parse phmmer results:
-        all_results[sp] = internal.parse_the_hmmer(phandle)
+        all_results[sp] = internal.HMMer(phandle)
 
         # determine cutoff threshold for filtering results:
         if sp == query_species:
-            bestscore = max( v[1] for v in all_results[sp].values())
+            bestscore = max( td['score'] for td in all_results[sp].stats.values() )
             has_bestscore = True
         elif has_bestscore:
             pass
         else:
-            score_list = [ v[1] for v in all_results[sp].values() ]
+            score_list = [ td['score'] for td in all_results[sp].stats.values() ]
             if len(score_list) > 0:
                 bestscore = max( score_list )
             else:
@@ -192,8 +192,8 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
         cutoff_thresh = minthresh * bestscore
 
         # filter local file based on parameters given:
-        ars = all_results[sp]
-        filtered_results[sp] = { gene:(sp, ars[gene][1], ars[gene][0]) for i,gene in enumerate(ars) if ars[gene][1] >= cutoff_thresh or i < mincollect}
+        hmmrs = all_results[sp]
+        filtered_results[sp] = { gene:(sp, hmmrs.stats[gene]['score'], hmmrs.stats[gene]['eval']) for i,gene in enumerate(hmmrs.stats) if hmmrs.stats[gene]['score'] >= cutoff_thresh or i < mincollect}
 
     # filter for global threshold (ie, based on % of best match). Most useful if no
     # species has been specified for fasta file.
@@ -204,6 +204,8 @@ def hmmer_search(fasta_seq, specieslist, query_species,  temp_dir, dbpaths={},
     except ValueError:
         bestscore = 0
     global_thresh = globalthresh * bestscore
+
+    # homologlist is the same as filtered_results in structure and content, just filtered.
     homologlist = { k:v for nd in filtered_results.values() for (k,v) in nd.items() if v[1] >= global_thresh }
 
     # clean up temporary files
